@@ -6,7 +6,7 @@
 
 import { TaskStatus, AIAgent, AutopilotJob, Skill, Project } from '../types'
 
-const API_BASE = import.meta.env.VITE_HERMES_API_URL || 'http://127.0.0.1:9120'
+const API_BASE = import.meta.env.VITE_HERMES_API_URL || ''
 
 export const hermesApi = {
   // Check health
