@@ -45,9 +45,19 @@ export const AgentsView: React.FC<{ agents: AIAgent[] }> = ({ agents }) => {
                   </div>
                 </td>
                 <td className="py-3 px-4">
-                  <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Online
-                  </span>
+                  {(() => {
+                    const statusStyle: Record<AIAgent['status'], { dot: string; text: string; label: string }> = {
+                      online: { dot: 'bg-emerald-500', text: 'text-emerald-600 dark:text-emerald-400', label: 'Online' },
+                      busy: { dot: 'bg-amber-500', text: 'text-amber-600 dark:text-amber-400', label: 'Busy' },
+                      offline: { dot: 'bg-slate-400', text: 'text-slate-500 dark:text-slate-400', label: 'Offline' }
+                    }
+                    const s = statusStyle[a.status] ?? statusStyle.offline
+                    return (
+                      <span className={`inline-flex items-center gap-1 text-[11px] font-medium ${s.text}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${s.dot} ${a.status === 'busy' ? 'animate-pulse' : ''}`} /> {s.label}
+                      </span>
+                    )
+                  })()}
                 </td>
                 <td className="py-3 px-4 text-slate-600 dark:text-slate-300">{a.owner}</td>
                 <td className="py-3 px-4 font-mono text-[11px] text-slate-400">{a.runtime}</td>
@@ -149,21 +159,46 @@ export const SkillsView: React.FC<{ skills: Skill[] }> = ({ skills }) => {
         <table className="w-full text-left text-xs border-collapse">
           <thead>
             <tr className="border-b border-slate-200 dark:border-[#23272F] bg-slate-50 dark:bg-[#14171D] text-slate-500">
-              <th className="py-2.5 px-4 font-medium">Name</th>
-              <th className="py-2.5 px-4 font-medium">Used By</th>
-              <th className="py-2.5 px-4 font-medium">Added By</th>
-              <th className="py-2.5 px-4 font-medium">Updated</th>
+              <th className="py-2.5 px-4 font-medium">Skill</th>
+              <th className="py-2.5 px-4 font-medium">Category</th>
+              <th className="py-2.5 px-4 font-medium">Status</th>
+              <th className="py-2.5 px-4 font-medium">Usage</th>
+              <th className="py-2.5 px-4 font-medium">Source</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200/80 dark:divide-[#1F232B]">
             {skills.map(sk => (
-              <tr key={sk.id} className="hover:bg-slate-50 dark:hover:bg-[#16191E]">
-                <td className="py-2.5 px-4 font-mono font-medium text-blue-600 dark:text-blue-400">
-                  {sk.name}
+              <tr key={sk.id} className="hover:bg-slate-50 dark:hover:bg-[#16191E] align-top">
+                <td className="py-2.5 px-4">
+                  <div className="font-mono font-medium text-blue-600 dark:text-blue-400">{sk.name}</div>
+                  {sk.description && (
+                    <div className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 line-clamp-2 max-w-md">
+                      {sk.description}
+                    </div>
+                  )}
                 </td>
-                <td className="py-2.5 px-4 text-slate-600 dark:text-slate-300">{sk.usedBy}</td>
-                <td className="py-2.5 px-4 text-slate-500">{sk.addedBy}</td>
-                <td className="py-2.5 px-4 text-slate-400">{sk.updatedAt}</td>
+                <td className="py-2.5 px-4">
+                  <span className="px-1.5 py-0.5 rounded text-[10px] bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 capitalize">
+                    {sk.category || 'uncategorized'}
+                  </span>
+                </td>
+                <td className="py-2.5 px-4">
+                  {sk.enabled ? (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" /> Enabled
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1 text-[11px] font-medium text-slate-400">
+                      <span className="w-1.5 h-1.5 rounded-full bg-slate-400" /> Disabled
+                    </span>
+                  )}
+                </td>
+                <td className="py-2.5 px-4 font-mono text-[11px] text-slate-500 dark:text-slate-400">
+                  {sk.usage ?? 0}×
+                </td>
+                <td className="py-2.5 px-4">
+                  <span className="text-[11px] text-slate-500 capitalize">{sk.provenance || 'agent'}</span>
+                </td>
               </tr>
             ))}
           </tbody>

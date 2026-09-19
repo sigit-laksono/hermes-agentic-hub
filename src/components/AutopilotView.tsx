@@ -1,12 +1,44 @@
-import React from 'react'
-import { Zap, Plus, Clock, Play } from 'lucide-react'
+import React, { useState } from 'react'
+import { Zap, Plus, Clock, Play, Pause, Loader2 } from 'lucide-react'
 import { AutopilotJob } from '../types'
 
 interface AutopilotViewProps {
   autopilots: AutopilotJob[]
+  onRunNow: (jobId: string) => Promise<void> | void
+  onToggleStatus: (jobId: string, current: AutopilotJob['status']) => Promise<void> | void
+  onNewAutopilot: () => void
 }
 
-export const AutopilotView: React.FC<AutopilotViewProps> = ({ autopilots }) => {
+export const AutopilotView: React.FC<AutopilotViewProps> = ({
+  autopilots,
+  onRunNow,
+  onToggleStatus,
+  onNewAutopilot
+}) => {
+  // Per-row busy state keyed by job id so only the acted row shows a spinner.
+  const [runningId, setRunningId] = useState<string | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  const handleRun = async (jobId: string) => {
+    if (runningId) return
+    setRunningId(jobId)
+    try {
+      await onRunNow(jobId)
+    } finally {
+      setRunningId(null)
+    }
+  }
+
+  const handleToggle = async (job: AutopilotJob) => {
+    if (togglingId) return
+    setTogglingId(job.id)
+    try {
+      await onToggleStatus(job.id, job.status)
+    } finally {
+      setTogglingId(null)
+    }
+  }
+
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3rem)] overflow-hidden bg-white dark:bg-[#0D0F12]">
       {/* Header */}
@@ -22,7 +54,7 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({ autopilots }) => {
           </span>
         </div>
 
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white transition-colors shadow-xs">
+        <button onClick={onNewAutopilot} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white transition-colors shadow-xs">
           <Plus className="w-3.5 h-3.5" />
           <span>New autopilot</span>
         </button>
@@ -70,9 +102,42 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({ autopilots }) => {
                   {job.nextRun}
                 </td>
                 <td className="py-3 px-4">
-                  <button className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px]">
-                    <Play className="w-2.5 h-2.5 fill-current" /> Run now
-                  </button>
+                  <div className="flex items-center gap-1.5">
+                    {/* Pause / Resume toggle reflecting live enabled state */}
+                    <button
+                      onClick={() => handleToggle(job)}
+                      disabled={togglingId === job.id}
+                      title={job.status === 'active' ? 'Pause schedule' : 'Resume schedule'}
+                      className={`px-2 py-1 rounded flex items-center gap-1 text-[11px] disabled:opacity-50 ${
+                        job.status === 'active'
+                          ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
+                          : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                      }`}
+                    >
+                      {togglingId === job.id ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : job.status === 'active' ? (
+                        <Pause className="w-2.5 h-2.5 fill-current" />
+                      ) : (
+                        <Play className="w-2.5 h-2.5 fill-current" />
+                      )}
+                      <span>{job.status === 'active' ? 'Pause' : 'Resume'}</span>
+                    </button>
+
+                    {/* Run now (manual trigger) */}
+                    <button
+                      onClick={() => handleRun(job.id)}
+                      disabled={runningId === job.id}
+                      className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px] disabled:opacity-50"
+                    >
+                      {runningId === job.id ? (
+                        <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                      ) : (
+                        <Play className="w-2.5 h-2.5 fill-current" />
+                      )}
+                      <span>{runningId === job.id ? 'Running…' : 'Run now'}</span>
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}

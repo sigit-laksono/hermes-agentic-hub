@@ -4,3 +4,6 @@ dist-ssr
 *.local
 .env
 *.tsbuildinfo
+server.log
+__pycache__/
+*.pyc

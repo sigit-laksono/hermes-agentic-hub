@@ -4,28 +4,53 @@ import {
   CheckCircle2,
   RotateCcw,
   MessageSquare,
-  Sparkles
+  Sparkles,
+  Loader2
 } from 'lucide-react'
 import { Task } from '../types'
 
 interface InboxViewProps {
   tasks: Task[]
   onApproveTask: (taskId: string) => void
-  onRequestChanges: (taskId: string) => void
+  onRequestChanges: (taskId: string, note?: string) => void
+  onSendComment: (taskId: string, note: string) => Promise<boolean> | boolean
 }
 
 export const InboxView: React.FC<InboxViewProps> = ({
   tasks,
   onApproveTask,
-  onRequestChanges
+  onRequestChanges,
+  onSendComment
 }) => {
   // Reviewable/recent tasks
   const reviewTasks = tasks.filter(t => t.status === 'in_review' || t.status === 'done')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
     reviewTasks.length > 0 ? reviewTasks[0].id : null
   )
+  const [note, setNote] = useState('')
+  const [sending, setSending] = useState(false)
+  const [sentOk, setSentOk] = useState<boolean | null>(null)
 
   const selectedTask = tasks.find(t => t.id === selectedTaskId)
+
+  const handleSend = async () => {
+    if (!selectedTask || !note.trim() || sending) return
+    setSending(true)
+    setSentOk(null)
+    try {
+      const ok = await onSendComment(selectedTask.id, note.trim())
+      setSentOk(ok)
+      if (ok) setNote('')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleRequestChanges = () => {
+    if (!selectedTask) return
+    onRequestChanges(selectedTask.id, note.trim() || undefined)
+    setNote('')
+  }
 
   return (
     <div className="flex-1 flex h-[calc(100vh-3rem)] overflow-hidden bg-white dark:bg-[#0D0F12]">
@@ -118,7 +143,7 @@ export const InboxView: React.FC<InboxViewProps> = ({
                 {selectedTask.status === 'in_review' ? (
                   <>
                     <button
-                      onClick={() => onRequestChanges(selectedTask.id)}
+                      onClick={handleRequestChanges}
                       className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium border border-rose-200 dark:border-rose-900/60 text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors"
                     >
                       <RotateCcw className="w-3.5 h-3.5" />
@@ -162,11 +187,27 @@ export const InboxView: React.FC<InboxViewProps> = ({
                   Leave Feedback / Instruction
                 </h4>
                 <textarea
+                  value={note}
+                  onChange={e => {
+                    setNote(e.target.value)
+                    setSentOk(null)
+                  }}
                   placeholder="Tambahkan catatan revisi atau instruksi lanjutan untuk agen..."
                   className="w-full h-20 p-2.5 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A1D24] text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
                 />
-                <div className="mt-2 flex justify-end">
-                  <button className="px-3 py-1 rounded text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600">
+                <div className="mt-2 flex items-center justify-end gap-2">
+                  {sentOk === true && (
+                    <span className="text-[11px] text-emerald-500">Comment sent ✓</span>
+                  )}
+                  {sentOk === false && (
+                    <span className="text-[11px] text-rose-500">Failed to send</span>
+                  )}
+                  <button
+                    onClick={handleSend}
+                    disabled={!note.trim() || sending}
+                    className="px-3 py-1 rounded text-xs bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-300 dark:hover:bg-slate-600 disabled:opacity-50 flex items-center gap-1.5"
+                  >
+                    {sending && <Loader2 className="w-3 h-3 animate-spin" />}
                     Send Comment
                   </button>
                 </div>

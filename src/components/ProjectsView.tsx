@@ -4,9 +4,10 @@ import { Project } from '../types'
 
 interface ProjectsViewProps {
   projects: Project[]
+  onNewProject: () => void
 }
 
-export const ProjectsView: React.FC<ProjectsViewProps> = ({ projects }) => {
+export const ProjectsView: React.FC<ProjectsViewProps> = ({ projects, onNewProject }) => {
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3rem)] overflow-hidden bg-white dark:bg-[#0D0F12]">
       {/* Header */}
@@ -19,7 +20,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({ projects }) => {
           </h2>
         </div>
 
-        <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-xs">
+        <button onClick={onNewProject} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-xs">
           <Plus className="w-3.5 h-3.5" />
           <span>New project</span>
         </button>

@@ -21,6 +21,7 @@ interface SidebarProps {
   activeTab: ViewTab
   onSelectTab: (tab: ViewTab) => void
   onOpenNewIssue: () => void
+  onOpenSearch: () => void
   unreadInboxCount: number
 }
 
@@ -28,6 +29,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   activeTab,
   onSelectTab,
   onOpenNewIssue,
+  onOpenSearch,
   unreadInboxCount
 }) => {
   const navItemClass = (tab: ViewTab) =>
@@ -55,7 +57,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Quick Actions */}
       <div className="p-2 space-y-1">
         <button
-          onClick={() => {}}
+          onClick={onOpenSearch}
           className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-md text-xs bg-slate-200/60 dark:bg-[#181B21] text-slate-500 dark:text-slate-400 border border-slate-300/60 dark:border-[#282C36] hover:border-slate-400 dark:hover:border-slate-600 transition-colors"
         >
           <div className="flex items-center gap-2">

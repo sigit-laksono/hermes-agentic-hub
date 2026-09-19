@@ -5,14 +5,20 @@ import {
   AlertCircle,
   Clock,
   Tag,
-  ArrowRight
+  ArrowRight,
+  Play,
+  Loader2
 } from 'lucide-react'
-import { Task, TaskStatus } from '../types'
+import { Task, TaskStatus, AIAgent } from '../types'
+import { TaskDetailModal } from './TaskDetailModal'
 
 interface KanbanBoardProps {
   tasks: Task[]
+  agents?: AIAgent[]
   onUpdateTaskStatus: (taskId: string, newStatus: TaskStatus) => void
   onOpenNewIssue: (initialStatus?: TaskStatus) => void
+  onRunAgent: (taskId: string) => Promise<boolean | void>
+  onSendComment?: (taskId: string, note: string) => Promise<boolean> | boolean
 }
 
 const columns: { id: TaskStatus; title: string; color: string; bgBadge: string }[] = [
@@ -26,16 +32,57 @@ const columns: { id: TaskStatus; title: string; color: string; bgBadge: string }
 
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   tasks,
+  agents = [],
   onUpdateTaskStatus,
-  onOpenNewIssue
+  onOpenNewIssue,
+  onRunAgent,
+  onSendComment
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'members' | 'agents'>('all')
+  // Native HTML5 drag-and-drop state (no external dependency).
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null)
+  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null)
+  const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
 
   const filteredTasks = tasks.filter(t => {
     if (filterType === 'members') return t.assigneeType === 'member'
     if (filterType === 'agents') return t.assigneeType === 'agent'
     return true
   })
+
+  const handleRunSingle = async (taskId: string) => {
+    setRunningTaskId(taskId)
+    try {
+      await onRunAgent(taskId)
+    } finally {
+      setRunningTaskId(null)
+    }
+  }
+
+  const handleDragStart = (e: React.DragEvent, taskId: string) => {
+    setDraggingId(taskId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', taskId)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingId(null)
+    setDragOverCol(null)
+  }
+
+  const handleDrop = (e: React.DragEvent, colId: TaskStatus) => {
+    e.preventDefault()
+    const taskId = e.dataTransfer.getData('text/plain') || draggingId
+    setDragOverCol(null)
+    setDraggingId(null)
+    if (!taskId) return
+    const task = filteredTasks.find(t => t.id === taskId)
+    // Only update when the column actually changed.
+    if (task && task.status !== colId) {
+      onUpdateTaskStatus(taskId, colId)
+    }
+  }
 
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3rem)] overflow-hidden bg-slate-50/50 dark:bg-[#0D0F12]">
@@ -82,7 +129,23 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           return (
             <div
               key={col.id}
-              className="w-72 shrink-0 flex flex-col max-h-full rounded-lg bg-slate-100/70 dark:bg-[#14171D] border border-slate-200/80 dark:border-[#20242D]"
+              onDragOver={e => {
+                e.preventDefault()
+                e.dataTransfer.dropEffect = 'move'
+                if (dragOverCol !== col.id) setDragOverCol(col.id)
+              }}
+              onDragLeave={e => {
+                // Only clear when leaving the column entirely (not entering a child).
+                if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+                  setDragOverCol(prev => (prev === col.id ? null : prev))
+                }
+              }}
+              onDrop={e => handleDrop(e, col.id)}
+              className={`w-72 shrink-0 flex flex-col max-h-full rounded-lg bg-slate-100/70 dark:bg-[#14171D] border transition-colors ${
+                dragOverCol === col.id
+                  ? 'border-blue-500 dark:border-blue-500 ring-1 ring-blue-500/40'
+                  : 'border-slate-200/80 dark:border-[#20242D]'
+              }`}
             >
               {/* Column Header */}
               <div className="p-2.5 flex items-center justify-between border-b border-slate-200 dark:border-[#20242D]">
@@ -116,7 +179,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   colTasks.map(task => (
                     <div
                       key={task.id}
-                      className="p-3 rounded-md bg-white dark:bg-[#1A1D24] border border-slate-200 dark:border-[#282D37] shadow-xs hover:border-slate-300 dark:hover:border-slate-600 transition-all group"
+                      draggable
+                      onDragStart={e => handleDragStart(e, task.id)}
+                      onDragEnd={handleDragEnd}
+                      onClick={() => setSelectedTaskForDetail(task)}
+                      className={`p-3 rounded-md bg-white dark:bg-[#1A1D24] border border-slate-200 dark:border-[#282D37] shadow-xs hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all group cursor-grab active:cursor-grabbing ${
+                        draggingId === task.id ? 'opacity-40' : ''
+                      }`}
                     >
                       {/* Top meta: ID + Priority */}
                       <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
@@ -160,21 +229,48 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               👤
                             </span>
                           )}
-                          <span className="truncate max-w-[110px] text-[10px] font-medium">
+                          <span className="truncate max-w-[90px] text-[10px] font-medium">
                             {task.assigneeName}
                           </span>
                         </div>
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
-                          <Clock className="w-2.5 h-2.5" />
-                          {task.updatedAt}
-                        </span>
+
+                        {/* Direct Run Agent Action */}
+                        {task.status === 'in_progress' ? (
+                          <span className="inline-flex items-center gap-1 text-[10px] font-semibold text-amber-500 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                            <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse" />
+                            Working
+                          </span>
+                        ) : task.status !== 'done' ? (
+                          <button
+                            onClick={e => {
+                              e.stopPropagation()
+                              handleRunSingle(task.id)
+                            }}
+                            disabled={runningTaskId === task.id}
+                            className="inline-flex items-center gap-1 text-[10px] font-semibold text-white bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 px-2 py-0.5 rounded shadow-xs active:scale-95 transition-all cursor-pointer disabled:opacity-50"
+                            title="Run task with Hermes Agent immediately"
+                          >
+                            {runningTaskId === task.id ? (
+                              <Loader2 className="w-2.5 h-2.5 animate-spin" />
+                            ) : (
+                              <Play className="w-2.5 h-2.5 fill-current" />
+                            )}
+                            <span>Run Agent</span>
+                          </button>
+                        ) : (
+                          <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1">
+                            <Clock className="w-2.5 h-2.5" />
+                            {task.updatedAt}
+                          </span>
+                        )}
                       </div>
 
                       {/* Quick status progress actions on hover */}
                       <div className="mt-2 pt-1.5 border-t border-dashed border-slate-100 dark:border-slate-800/60 hidden group-hover:flex items-center justify-end gap-1">
                         {col.id !== 'done' && (
                           <button
-                            onClick={() => {
+                            onClick={e => {
+                              e.stopPropagation()
                               const nextMap: Record<TaskStatus, TaskStatus> = {
                                 backlog: 'todo',
                                 todo: 'in_progress',
@@ -200,6 +296,17 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           )
         })}
       </div>
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        isOpen={!!selectedTaskForDetail}
+        onClose={() => setSelectedTaskForDetail(null)}
+        task={selectedTaskForDetail}
+        agents={agents}
+        onUpdateStatus={onUpdateTaskStatus}
+        onRunAgent={onRunAgent}
+        onSendComment={onSendComment || (() => false)}
+      />
     </div>
   )
 }

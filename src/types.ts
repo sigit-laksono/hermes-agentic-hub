@@ -3,16 +3,19 @@ export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'blo
 export type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 
 export interface Task {
-  id: string              // e.g. "DIK-55"
+  id: string              // e.g. "DIK-55" (UI display id)
+  rawId?: string          // canonical Hermes id (e.g. "t_663b67ed") — present only for live tasks
   title: string
   description?: string
   status: TaskStatus
   priority: Priority
   assigneeType: 'member' | 'agent'
   assigneeName: string
+  assigneeProfile?: string
   assigneeAvatar?: string
   projectName: string
   projectTag?: string
+  boardSlug?: string
   updatedAt: string
   reviewReport?: string
 }
@@ -67,6 +70,11 @@ export interface Squad {
 export interface Skill {
   id: string
   name: string
+  description?: string
+  category?: string
+  enabled?: boolean
+  usage?: number
+  provenance?: string
   usedBy: string
   addedBy: string
   updatedAt: string
