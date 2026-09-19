@@ -82,6 +82,4 @@ export type ViewTab =
   | 'agents' 
   | 'squads' 
   | 'skills'
-  | 'runtimes'
-  | 'analytics'
   | 'settings'

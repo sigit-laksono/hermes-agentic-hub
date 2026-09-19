@@ -9,8 +9,6 @@ import {
   Bot,
   Users,
   Wrench,
-  Cpu,
-  BarChart3,
   Settings,
   Search,
   Plus,
@@ -193,26 +191,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
 
           <div
-            onClick={() => onSelectTab('runtimes')}
-            className={navItemClass('runtimes')}
-          >
-            <div className="flex items-center gap-2">
-              <Cpu className="w-3.5 h-3.5 text-slate-400" />
-              <span>Runtimes</span>
-            </div>
-          </div>
-
-          <div
-            onClick={() => onSelectTab('analytics')}
-            className={navItemClass('analytics')}
-          >
-            <div className="flex items-center gap-2">
-              <BarChart3 className="w-3.5 h-3.5 text-slate-400" />
-              <span>Analytics</span>
-            </div>
-          </div>
-
-          <div
             onClick={() => onSelectTab('settings')}
             className={navItemClass('settings')}
           >
@@ -226,11 +204,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Footer */}
       <div className="p-3 border-t border-slate-200 dark:border-[#23272F] flex items-center justify-between text-xs text-slate-500">
-        <div className="flex items-center gap-1.5 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200">
-          <span className="text-sm">👾</span>
-          <span>Join our Discord</span>
+        <div className="flex items-center gap-1.5 font-medium text-[11px] text-slate-500 dark:text-slate-400">
+          <span className="w-2 h-2 rounded-full bg-emerald-500" />
+          <span>Hermes Agentic Hub</span>
         </div>
-        <HelpCircle className="w-4 h-4 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200" />
+        <HelpCircle className="w-3.5 h-3.5 cursor-pointer hover:text-slate-800 dark:hover:text-slate-200" />
       </div>
     </aside>
   )

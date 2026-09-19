@@ -61,7 +61,7 @@ Sistem ini memungkinkan pengguna untuk:
   * Quick Actions: Search (`Ctrl K`), New Issue (`C`).
   * Personal: `Inbox` (badge unread count), `My Issues`, `Chat`.
   * Work: `Issues` (global), `Projects`, `Autopilot`.
-  * AI Team: `Agents`, `Squads`, `Skills`, `Runtimes`, `Analytics`, `Settings`.
+  * AI Team: `Agents`, `Squads`, `Skills`, `Settings`.
 * **Header Bar:**
   * Dynamic breadcrumb navigation.
   * Live Agent Status: `X agents working` (terhubung ke endpoint `GET /workers/active`).

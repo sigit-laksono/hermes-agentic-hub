@@ -29,8 +29,6 @@ const tabTitles: Record<ViewTab, string> = {
   agents: 'Agents',
   squads: 'Squads',
   skills: 'Skills',
-  runtimes: 'Runtimes',
-  analytics: 'Analytics',
   settings: 'Settings'
 }
 

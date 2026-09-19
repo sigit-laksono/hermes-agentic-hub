@@ -258,7 +258,7 @@ export const AppContent: React.FC = () => {
 
           {activeTab === 'skills' && <SkillsView skills={skills} />}
 
-          {['chat', 'runtimes', 'analytics', 'settings'].includes(activeTab) && (
+          {['chat', 'settings'].includes(activeTab) && (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
               <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800/80 mb-3 text-2xl">
                 ⚙️
