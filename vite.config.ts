@@ -16,6 +16,7 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:9120',
         changeOrigin: true,
+        ws: true,
       },
     },
   },
@@ -27,6 +28,19 @@ export default defineConfig({
       '/api': {
         target: 'http://127.0.0.1:9120',
         changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom'],
+          'vendor-prism': ['prismjs'],
+          'vendor-markdown': ['marked'],
+          'vendor-icons': ['lucide-react'],
+        },
       },
     },
   },

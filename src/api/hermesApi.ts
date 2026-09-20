@@ -4,7 +4,46 @@
  * Communicates with the local Hermes harness bridge (http://127.0.0.1:9120)
  */
 
-import { TaskStatus, AIAgent, AutopilotJob, Skill, Project, Squad } from '../types'
+import {
+  TaskStatus,
+  AIAgent,
+  AutopilotJob,
+  Skill,
+  Squad,
+  TaskAttachment,
+  WorkerProcessInfo,
+  ActiveWorker,
+  TaskDetailsResponse,
+  TaskEstimateResult,
+  TaskLinksInfo,
+  ChatSession,
+  ChatMessage,
+  ToolCall,
+  ChatConnectionState,
+  Board,
+  OrchestrationSettings,
+  ModelOptionsResponse,
+  SkillContent,
+  CreateProfilePayload
+} from '../types'
+
+export interface ChatSocketHandlers {
+  onReady?: () => void
+  onToken?: (token: string) => void
+  onThinking?: (thinking: string) => void
+  onToolStart?: (tool: ToolCall) => void
+  onToolEnd?: (tool: ToolCall) => void
+  onComplete?: (message: { text: string; reasoning?: string; usage?: any }) => void
+  onError?: (error: string) => void
+  onTitleChange?: (title: string) => void
+  onStatusChange?: (status: ChatConnectionState) => void
+}
+
+export interface ChatSocketController {
+  sendMessage: (text: string) => void
+  interrupt: () => void
+  close: () => void
+}
 
 const API_BASE = import.meta.env.VITE_HERMES_API_URL || ''
 
@@ -20,8 +59,9 @@ export const hermesApi = {
   },
 
   // 1. Kanban Board & Tasks
-  async getBoard(): Promise<{ columns: { name: string; tasks: any[] }[]; assignees: any[] }> {
-    const res = await fetch(`${API_BASE}/api/plugins/kanban/board`)
+  async getBoard(board?: string): Promise<{ columns: { name: string; tasks: any[] }[]; assignees: any[] }> {
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    const res = await fetch(`${API_BASE}/api/plugins/kanban/board${query}`)
     if (!res.ok) throw new Error(`Failed to fetch board: ${res.statusText}`)
     return res.json()
   },
@@ -56,7 +96,7 @@ export const hermesApi = {
     return res.json()
   },
 
-  async updateTaskStatus(taskId: string, status: TaskStatus): Promise<any> {
+  async updateTaskStatus(taskId: string, status: TaskStatus, board?: string): Promise<any> {
     // Map status string to hermes canonical status
     const statusMap: Record<string, string> = {
       backlog: 'triage',
@@ -68,16 +108,158 @@ export const hermesApi = {
     }
 
     const targetStatus = statusMap[status] || status
-    const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}`, {
+    return this.updateTask(taskId, { status: targetStatus }, board)
+  },
+
+  async updateTask(
+    taskId: string,
+    payload: { status?: string; assignee?: string; priority?: number; title?: string; body?: string },
+    board?: string
+  ): Promise<any> {
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}${query}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status: targetStatus })
+      body: JSON.stringify(payload)
     })
     if (!res.ok) throw new Error(`Failed to update task: ${res.statusText}`)
     return res.json()
   },
 
-  async getActiveWorkers(): Promise<any[]> {
+  // Helper to get canonical Hermes task ID (e.g. "t_xxxx")
+  getCanonicalTaskId(taskOrId: string | { id: string; rawId?: string }): string {
+    if (typeof taskOrId === 'string') {
+      if (taskOrId.startsWith('t_')) return taskOrId
+      return taskOrId.replace('DIK-', 't_')
+    }
+    return taskOrId.rawId || (taskOrId.id.startsWith('t_') ? taskOrId.id : taskOrId.id.replace('DIK-', 't_'))
+  },
+
+  // 1b. Native Hermes AI Actions (Specify, Decompose, Estimate, Links)
+  async specifyTask(
+    taskId: string,
+    board?: string
+  ): Promise<{ ok: boolean; task_id?: string; new_title?: string; reason?: string }> {
+    try {
+      const canonicalId = this.getCanonicalTaskId(taskId)
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${canonicalId}/specify${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: 'dashboard' })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, reason: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, reason: err.message || 'Failed to specify task' }
+    }
+  },
+
+  async decomposeTask(
+    taskId: string,
+    board?: string
+  ): Promise<{ ok: boolean; task_id?: string; reason?: string; fanout?: boolean; child_ids?: string[]; new_title?: string }> {
+    try {
+      const canonicalId = this.getCanonicalTaskId(taskId)
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${canonicalId}/decompose${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ author: 'dashboard' })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, reason: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, reason: err.message || 'Failed to decompose task' }
+    }
+  },
+
+  async estimateTask(taskId: string, board?: string): Promise<TaskEstimateResult> {
+    try {
+      const canonicalId = this.getCanonicalTaskId(taskId)
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${canonicalId}/estimate${query}`, {
+        method: 'POST'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, reason: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, reason: err.message || 'Failed to estimate task' }
+    }
+  },
+
+  async getTaskLinks(taskId: string, board?: string): Promise<TaskLinksInfo> {
+    try {
+      const canonicalId = this.getCanonicalTaskId(taskId)
+      const params = new URLSearchParams()
+      if (canonicalId) params.set('task_id', canonicalId)
+      if (board) params.set('board', board)
+      const query = params.toString() ? `?${params.toString()}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/links${query}`)
+      if (!res.ok) return { parents: [], children: [], blocked_by_active: false }
+      return res.json()
+    } catch {
+      return { parents: [], children: [], blocked_by_active: false }
+    }
+  },
+
+  async createTaskLink(
+    parentId: string,
+    childId: string,
+    board?: string
+  ): Promise<{ ok: boolean; gated?: boolean; message?: string }> {
+    try {
+      const cParent = this.getCanonicalTaskId(parentId)
+      const cChild = this.getCanonicalTaskId(childId)
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/links${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ parent_id: cParent, child_id: cChild })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to create task link' }
+    }
+  },
+
+  async deleteTaskLink(
+    parentId: string,
+    childId: string,
+    board?: string
+  ): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const cParent = this.getCanonicalTaskId(parentId)
+      const cChild = this.getCanonicalTaskId(childId)
+      const params = new URLSearchParams({ parent_id: cParent, child_id: cChild })
+      if (board) params.set('board', board)
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/links?${params.toString()}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to delete task link' }
+    }
+  },
+
+  async getActiveWorkers(): Promise<ActiveWorker[]> {
     try {
       const res = await fetch(`${API_BASE}/api/plugins/kanban/workers/active`)
       if (!res.ok) return []
@@ -85,6 +267,135 @@ export const hermesApi = {
       return Array.isArray(data) ? data : data.workers || []
     } catch {
       return []
+    }
+  },
+
+  // Inspect live worker process telemetry (CPU, Memory, PID, threads)
+  async inspectRun(runId: number, board?: string): Promise<WorkerProcessInfo | null> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/runs/${runId}/inspect${query}`)
+      if (!res.ok) return null
+      return res.json()
+    } catch {
+      return null
+    }
+  },
+
+  // Terminate an active run worker immediately (SIGTERM -> SIGKILL)
+  async terminateRun(runId: number, reason = 'Terminated from dashboard', board?: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/runs/${runId}/terminate${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to terminate run' }
+    }
+  },
+
+  // Reclaim a task directly (releasing any active worker claim)
+  async reclaimTask(taskId: string, reason = 'Reclaimed from dashboard', board?: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}/reclaim${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reason })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to reclaim task' }
+    }
+  },
+
+  // Get deliverables / attachments for a specific task
+  async getTaskAttachments(taskId: string, board?: string): Promise<TaskAttachment[]> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}/attachments${query}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      return Array.isArray(data) ? data : data.attachments || []
+    } catch {
+      return []
+    }
+  },
+
+  // Get direct download URL for an attachment
+  getAttachmentDownloadUrl(attachmentId: number, board?: string): string {
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    return `${API_BASE}/api/plugins/kanban/attachments/${attachmentId}${query}`
+  },
+
+  // Fetch raw text content of an attachment (for inline code/spec preview)
+  async getAttachmentContent(attachmentId: number, board?: string): Promise<string> {
+    try {
+      const url = this.getAttachmentDownloadUrl(attachmentId, board)
+      const res = await fetch(url)
+      if (!res.ok) return ''
+      return res.text()
+    } catch {
+      return ''
+    }
+  },
+
+  // Upload an attachment to a task
+  async uploadTaskAttachment(
+    taskId: string,
+    file: File,
+    uploadedBy = 'user',
+    board?: string
+  ): Promise<{ ok: boolean; attachment?: TaskAttachment; message?: string }> {
+    try {
+      const params = new URLSearchParams()
+      if (uploadedBy) params.set('uploaded_by', uploadedBy)
+      if (board) params.set('board', board)
+      const query = params.toString() ? `?${params.toString()}` : ''
+
+      const formData = new FormData()
+      formData.append('file', file)
+
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}/attachments${query}`, {
+        method: 'POST',
+        body: formData
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      const data = await res.json()
+      return { ok: true, attachment: data.attachment || data }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to upload attachment' }
+    }
+  },
+
+  // Delete an attachment
+  async deleteAttachment(attachmentId: number, board?: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/attachments/${attachmentId}${query}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to delete attachment' }
     }
   },
 
@@ -134,7 +445,7 @@ export const hermesApi = {
   },
 
   // Get comprehensive task details (comments, runs, events, attachments)
-  async getTaskDetails(taskId: string, board?: string): Promise<any> {
+  async getTaskDetails(taskId: string, board?: string): Promise<TaskDetailsResponse | null> {
     try {
       const query = board ? `?board=${encodeURIComponent(board)}` : ''
       const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}${query}`)
@@ -163,7 +474,7 @@ export const hermesApi = {
 
       return list.map((p: any) => {
         const meta = profileMeta[p.name]
-        const displayName = meta?.name || p.display_name || p.name
+        const displayName = p.display_name || meta?.name || p.name
         const avatar =
           meta?.avatar ||
           (p.name.includes('aws')
@@ -179,17 +490,172 @@ export const hermesApi = {
         return {
           id: p.name,
           name: displayName,
-          description: p.description || `Hermes Profile: ${p.name}`,
+          displayName: p.display_name || displayName,
+          description: p.description || (p.is_default ? 'Hermes Core Default Agent with full autonomous execution capabilities.' : `Hermes Profile: ${p.name}`),
+          descriptionAuto: Boolean(p.description_auto),
           status: p.gateway_running ? 'online' : 'offline',
           owner: 'Muhammad Sigit',
           access: 'Workspace',
-          runtime: `${p.model} (${p.provider})`,
+          runtime: `${p.model || 'hermes-agent'} (${p.provider || 'custom'})`,
           lastActive: p.gateway_running ? 'Active now' : 'Idle',
-          avatar
+          avatar,
+          model: p.model,
+          provider: p.provider,
+          path: p.path,
+          isDefault: Boolean(p.is_default),
+          skillCount: typeof p.skill_count === 'number' ? p.skill_count : 0,
+          gatewayRunning: Boolean(p.gateway_running),
+          workingDir: p.path
         }
       })
     } catch {
       return []
+    }
+  },
+
+  // Profile SOUL, Model, and Skills Management (Fase 4)
+  async getProfileSoul(profileName: string): Promise<{ content: string; exists: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileName)}/soul`)
+      if (!res.ok) return { content: '', exists: false }
+      return res.json()
+    } catch {
+      return { content: '', exists: false }
+    }
+  },
+
+  async updateProfileSoul(profileName: string, content: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileName)}/soul`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async updateProfileDescription(profileName: string, description: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileName)}/description`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description })
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async getModelOptions(): Promise<ModelOptionsResponse> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/model-options`)
+      if (!res.ok) return { providers: [] }
+      return res.json()
+    } catch {
+      return { providers: [] }
+    }
+  },
+
+  async updateProfileModel(profileName: string, provider: string, model: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(profileName)}/model`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider, model })
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async createProfile(payload: CreateProfilePayload): Promise<{ ok: boolean; name?: string; message?: string }> {
+    try {
+      const body: Record<string, any> = {
+        name: payload.name.trim().toLowerCase(),
+        description: payload.description || undefined,
+        clone_from: payload.clone_from || undefined,
+        clone_from_default: payload.clone_from_default ?? (!payload.clone_from),
+        provider: payload.provider || undefined,
+        model: payload.model || undefined
+      }
+      const res = await fetch(`${API_BASE}/api/profiles`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      const data = await res.json()
+      return { ok: true, name: data.name }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to create agent profile' }
+    }
+  },
+
+  async getProfileSkills(profileName: string): Promise<Skill[]> {
+    try {
+      const res = await fetch(`${API_BASE}/api/skills?profile=${encodeURIComponent(profileName)}`)
+      if (!res.ok) return []
+      const skills = await res.json()
+      return skills.map((s: any, idx: number) => ({
+        id: `sk-${profileName}-${idx + 1}`,
+        name: s.editorial_name || s.name,
+        description: s.editorial_description || s.description || '',
+        category: s.category || 'uncategorized',
+        enabled: s.enabled !== false,
+        usage: typeof s.usage === 'number' ? s.usage : 0,
+        provenance: s.provenance || 'agent',
+        usedBy: s.provenance === 'bundled' ? 'Bundled' : 'Agent-provided',
+        addedBy: s.provenance || 'system',
+        updatedAt: typeof s.usage === 'number' && s.usage > 0 ? `Used ${s.usage}×` : 'Not used yet'
+      }))
+    } catch {
+      return []
+    }
+  },
+
+  async toggleProfileSkill(profileName: string, skillName: string, enabled: boolean): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/skills/toggle?profile=${encodeURIComponent(profileName)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: skillName, enabled, profile: profileName })
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async getSkillContent(skillName: string, profileName?: string): Promise<SkillContent | null> {
+    try {
+      const params = new URLSearchParams({ name: skillName })
+      if (profileName) params.set('profile', profileName)
+      const res = await fetch(`${API_BASE}/api/skills/content?${params.toString()}`)
+      if (!res.ok) return null
+      return res.json()
+    } catch {
+      return null
+    }
+  },
+
+  async toggleSkill(skillName: string, enabled: boolean): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/skills/toggle`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: skillName, enabled })
+      })
+      return res.ok
+    } catch {
+      return false
     }
   },
 
@@ -304,7 +770,7 @@ export const hermesApi = {
   },
 
   // 5. Boards (Projects)
-  async getBoards(): Promise<Project[]> {
+  async getBoards(): Promise<Board[]> {
     try {
       const res = await fetch(`${API_BASE}/api/plugins/kanban/boards`)
       if (!res.ok) return []
@@ -313,15 +779,20 @@ export const hermesApi = {
 
       return boards.map((b: any) => ({
         id: b.slug,
+        slug: b.slug,
         name: b.name || b.slug,
-        status: 'active',
-        priority: 'medium',
-        progressDone: b.counts?.done || 0,
-        progressTotal: b.counts?.total || 1,
-        lead: 'Muhammad Sigit',
-        leadAvatar: '👤',
-        createdAt: 'Active',
-        description: b.description || `Board ${b.slug}`
+        description: b.description || '',
+        icon: b.icon || '',
+        color: b.color || '',
+        is_current: Boolean(b.is_current),
+        counts: b.counts || {},
+        total: typeof b.total === 'number' ? b.total : 0,
+        default_workdir: b.default_workdir || '',
+        default_workspace_kind: b.default_workspace_kind || 'scratch',
+        project_id: b.project_id || '',
+        project_name: b.project_name || '',
+        created_at: b.created_at,
+        updated_at: b.updated_at
       }))
     } catch {
       return []
@@ -329,14 +800,23 @@ export const hermesApi = {
   },
 
   // Create a new board (project). slug must be unique; collision returns existing.
-  async createBoard(params: { slug: string; name?: string; description?: string }): Promise<boolean> {    try {
+  async createBoard(params: {
+    slug: string
+    name?: string
+    description?: string
+    default_workdir?: string
+    switch?: boolean
+  }): Promise<boolean> {
+    try {
       const res = await fetch(`${API_BASE}/api/plugins/kanban/boards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           slug: params.slug,
-          name: params.name,
-          description: params.description
+          name: params.name || params.slug,
+          description: params.description || '',
+          default_workdir: params.default_workdir || undefined,
+          switch: params.switch ?? false
         })
       })
       return res.ok
@@ -345,8 +825,131 @@ export const hermesApi = {
     }
   },
 
-  // 6. Orchestration settings (used to derive live Squads)
-  async getOrchestration(): Promise<{    resolvedOrchestrator: string
+  // Update board metadata (name, description/shared context, workdir)
+  async updateBoard(
+    slug: string,
+    payload: {
+      name?: string
+      description?: string
+      icon?: string
+      color?: string
+      default_workdir?: string
+    }
+  ): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/boards/${encodeURIComponent(slug)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  // Persist board as active on backend
+  async switchBoard(slug: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/boards/${encodeURIComponent(slug)}/switch`, {
+        method: 'POST'
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  // Archive or hard-delete a board
+  async deleteBoard(slug: string, hardDelete = false): Promise<boolean> {
+    try {
+      const query = hardDelete ? '?delete=true' : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/boards/${encodeURIComponent(slug)}${query}`, {
+        method: 'DELETE'
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  // Export board as Hermes portable archive (.tar.gz)
+  async exportBoardArchive(slug: string): Promise<{ ok: boolean; archive?: string; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/boards/${encodeURIComponent(slug)}/export`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+      })
+      if (!res.ok) return { ok: false, message: res.statusText }
+      const data = await res.json()
+      return { ok: true, archive: data.archive }
+    } catch (err: any) {
+      return { ok: false, message: err.message }
+    }
+  },
+
+  // Export board as complete JSON (metadata + tasks + links)
+  async exportBoardJson(slug: string): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/boards/${encodeURIComponent(slug)}/export-json`)
+      if (!res.ok) return null
+      return res.json()
+    } catch {
+      return null
+    }
+  },
+
+  // Import board from JSON backup payload
+  async importBoardJson(payload: {
+    slug: string
+    name?: string
+    description?: string
+    tasks?: any[]
+    links?: any[]
+  }): Promise<{ ok: boolean; board?: any; imported_tasks?: number; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/boards/import-json`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, message: err.message }
+    }
+  },
+
+  // 6. Orchestration settings (used to derive live Squads and Cockpit Knobs)
+  async getOrchestrationSettings(): Promise<OrchestrationSettings | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/orchestration`)
+      if (!res.ok) return null
+      return res.json()
+    } catch {
+      return null
+    }
+  },
+
+  async updateOrchestration(payload: Partial<OrchestrationSettings>): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/orchestration`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async getOrchestration(): Promise<{
+    resolvedOrchestrator: string
     defaultAssignee: string
     autoDecompose: boolean
     activeProfile: string
@@ -465,6 +1068,319 @@ export const hermesApi = {
         socket?.close()
       } catch {
         /* ignore */
+      }
+    }
+  },
+
+  // 7. Chat & Sessions Management (Fase 2)
+  async getSessions(profile?: string, limit = 50): Promise<ChatSession[]> {
+    try {
+      const params = new URLSearchParams({ limit: String(limit), order: 'recent' })
+      if (profile && profile !== 'all') params.set('profile', profile)
+      const res = await fetch(`${API_BASE}/api/sessions?${params.toString()}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      const list = data.sessions || []
+      return list.map((s: any) => ({
+        id: s.id,
+        title: s.title || (s.preview ? s.preview.slice(0, 45) : 'Untitled Chat'),
+        model: s.model || 'hermes-agent',
+        profile: s.profile_name || s.profile || 'default',
+        started_at: s.started_at,
+        last_active: s.last_active || s.last_activity_at || s.started_at,
+        message_count: s.message_count || 0,
+        is_active: Boolean(s.is_active),
+        preview: s.preview || '',
+        unread: Boolean(s.unread)
+      }))
+    } catch {
+      return []
+    }
+  },
+
+  async createSession(params?: { profile?: string; title?: string }): Promise<ChatSession | null> {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: params?.title || 'New Chat',
+          profile: params?.profile || 'default'
+        })
+      })
+      if (!res.ok) return null
+      const data = await res.json()
+      return {
+        id: data.session_id || data.id,
+        title: data.title || 'New Chat',
+        profile: data.profile || 'default',
+        started_at: data.started_at || Date.now() / 1000,
+        message_count: 0,
+        is_active: true
+      }
+    } catch {
+      return null
+    }
+  },
+
+  async deleteSession(sessionId: string, profile?: string): Promise<boolean> {
+    try {
+      const query = profile ? `?profile=${encodeURIComponent(profile)}` : ''
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionId}${query}`, {
+        method: 'DELETE'
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async renameSession(sessionId: string, title: string, profile?: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title, profile })
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  async getSessionMessages(sessionId: string, profile?: string): Promise<ChatMessage[]> {
+    try {
+      const query = profile ? `?profile=${encodeURIComponent(profile)}` : ''
+      const res = await fetch(`${API_BASE}/api/sessions/${sessionId}/messages${query}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      const rawMessages = data.messages || []
+
+      return rawMessages.map((m: any, idx: number): ChatMessage => {
+        let content = m.display_content || m.content || ''
+        if (typeof content !== 'string') {
+          try {
+            content = JSON.stringify(content)
+          } catch {
+            content = String(content)
+          }
+        }
+
+        // Parse tool calls if present
+        let toolCalls: ToolCall[] | undefined = undefined
+        if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+          toolCalls = m.tool_calls.map((tc: any) => ({
+            id: tc.id || String(Math.random()),
+            name: tc.name || tc.function?.name || 'tool',
+            args: tc.args || tc.function?.arguments || {},
+            output: tc.output || '',
+            status: 'completed'
+          }))
+        } else if (m.role === 'tool' && m.tool_name) {
+          toolCalls = [{
+            id: m.tool_call_id || String(idx),
+            name: m.tool_name,
+            output: content,
+            status: 'completed'
+          }]
+        }
+
+        return {
+          id: m.id || idx,
+          session_id: sessionId,
+          role: m.role || 'assistant',
+          content,
+          tool_calls: toolCalls,
+          tool_name: m.tool_name,
+          tool_call_id: m.tool_call_id,
+          reasoning: m.reasoning || m.reasoning_content || '',
+          timestamp: m.timestamp
+        }
+      })
+    } catch {
+      return []
+    }
+  },
+
+  // Interactive Live Chat via WebSocket connection
+  connectChat(
+    sessionId: string,
+    profile: string,
+    handlers: ChatSocketHandlers
+  ): ChatSocketController {
+    let socket: WebSocket | null = null
+    let closed = false
+    let runtimeSessionId: string = sessionId
+    let reqCounter = 1
+
+    const wsBase = () => {
+      if (API_BASE) return API_BASE.replace(/^http/, 'ws')
+      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+      return `${proto}://${window.location.host}`
+    }
+
+    const fetchToken = async (): Promise<string> => {
+      try {
+        const res = await fetch(`${API_BASE}/api/ws-token`)
+        if (!res.ok) return ''
+        const data = await res.json()
+        return data.token || ''
+      } catch {
+        return ''
+      }
+    }
+
+    const sendRpc = (method: string, params: Record<string, any>) => {
+      if (!socket || socket.readyState !== WebSocket.OPEN) return
+      const id = ++reqCounter
+      socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
+      return id
+    }
+
+    const initConnection = async () => {
+      handlers.onStatusChange?.('connecting')
+      const token = await fetchToken()
+      if (closed) return
+
+      const profileParam = profile && profile !== 'default' ? `&profile=${encodeURIComponent(profile)}` : ''
+      const url = `${wsBase()}/api/chat/ws?token=${encodeURIComponent(token)}${profileParam}`
+      socket = new WebSocket(url)
+
+      socket.onopen = () => {
+        // Connected to websocket gateway
+      }
+
+      socket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data)
+          if (!data) return
+
+          // Handle RPC responses
+          if (data.id && data.result) {
+            if (data.result.session_id) {
+              runtimeSessionId = data.result.session_id
+            }
+          }
+
+          // Handle Gateway Ready
+          if (data.method === 'event' && data.params?.type === 'gateway.ready') {
+            handlers.onStatusChange?.('connected')
+            handlers.onReady?.()
+
+            // Try to resume existing session or create session
+            if (sessionId) {
+              sendRpc('session.resume', {
+                session_id: sessionId,
+                profile: profile || undefined
+              })
+            } else {
+              sendRpc('session.create', {
+                profile: profile || 'default',
+                title: 'New Chat'
+              })
+            }
+          }
+
+          // Handle Events
+          if (data.method === 'event' && data.params) {
+            const { type, payload } = data.params
+
+            switch (type) {
+              case 'message.start':
+                handlers.onStatusChange?.('streaming')
+                break
+
+              case 'thinking.delta':
+                if (payload?.text) {
+                  handlers.onThinking?.(payload.text)
+                }
+                break
+
+              case 'message.delta': {
+                const text = payload?.text ?? payload?.delta ?? ''
+                if (text) {
+                  handlers.onToken?.(text)
+                }
+                break
+              }
+
+              case 'tool.generating':
+              case 'tool.start':
+                handlers.onToolStart?.({
+                  id: payload?.id || String(Date.now()),
+                  name: payload?.name || 'tool',
+                  args: payload?.args || {},
+                  status: 'running',
+                  started_at: Date.now()
+                })
+                break
+
+              case 'tool.complete':
+                handlers.onToolEnd?.({
+                  id: payload?.id || '',
+                  name: payload?.name || 'tool',
+                  output: payload?.output || payload?.result || payload?.summary || '',
+                  summary: payload?.summary || '',
+                  status: 'completed'
+                })
+                break
+
+              case 'message.complete':
+                handlers.onStatusChange?.('connected')
+                handlers.onComplete?.({
+                  text: payload?.text || '',
+                  reasoning: payload?.reasoning || '',
+                  usage: payload?.usage
+                })
+                break
+
+              case 'session.title':
+                if (payload?.title) {
+                  handlers.onTitleChange?.(payload.title)
+                }
+                break
+            }
+          }
+        } catch (e) {
+          console.warn('Failed to parse chat WS frame:', e)
+        }
+      }
+
+      socket.onerror = () => {
+        handlers.onStatusChange?.('error')
+        handlers.onError?.('WebSocket error')
+      }
+
+      socket.onclose = () => {
+        if (!closed) {
+          handlers.onStatusChange?.('disconnected')
+        }
+      }
+    }
+
+    initConnection()
+
+    return {
+      sendMessage: (text: string) => {
+        handlers.onStatusChange?.('streaming')
+        sendRpc('prompt.submit', {
+          session_id: runtimeSessionId || sessionId,
+          text
+        })
+      },
+      interrupt: () => {
+        sendRpc('session.interrupt', {
+          session_id: runtimeSessionId || sessionId
+        })
+        handlers.onStatusChange?.('connected')
+      },
+      close: () => {
+        closed = true
+        try {
+          socket?.close()
+        } catch {
+          /* ignore */
+        }
       }
     }
   }
