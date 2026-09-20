@@ -7,6 +7,7 @@ import { InboxView } from './components/InboxView'
 import { ProjectsView } from './components/ProjectsView'
 import { AutopilotView } from './components/AutopilotView'
 import { AgentsView, SquadsView, SkillsView } from './components/AITeamViews'
+import { ChatView } from './components/ChatView'
 import { NewIssueModal } from './components/NewIssueModal'
 import { SearchModal } from './components/SearchModal'
 import { NewAutopilotModal } from './components/NewAutopilotModal'
@@ -20,13 +21,24 @@ import {
   initialSquads,
   initialSkills
 } from './data/mockData'
-import { ViewTab, Task, TaskStatus } from './types'
+import { ViewTab, Task, TaskStatus, Board, Project } from './types'
 
 export const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ViewTab>('my_issues')
   const [viewMode, setViewMode] = useState<'board' | 'list'>('board')
+  const [activeBoard, setActiveBoard] = useState<string>(() => {
+    try {
+      const urlParams = new URLSearchParams(window.location.search)
+      const urlBoard = urlParams.get('board')
+      if (urlBoard) return urlBoard
+      return localStorage.getItem('hermes_active_board') || 'default'
+    } catch {
+      return 'default'
+    }
+  })
+  const [boards, setBoards] = useState<Board[]>([])
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
-  const [projects, setProjects] = useState(initialProjects)
+  const [projects, setProjects] = useState<Project[]>(initialProjects)
   const [autopilots, setAutopilots] = useState(initialAutopilots)
   const [agents, setAgents] = useState(initialAgents)
   const [squads, setSquads] = useState(initialSquads)
@@ -39,12 +51,36 @@ export const AppContent: React.FC = () => {
   const [isNewAutopilotOpen, setIsNewAutopilotOpen] = useState(false)
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false)
   const [newIssueInitialStatus, setNewIssueInitialStatus] = useState<TaskStatus>('todo')
+  const [chatInitialProfile, setChatInitialProfile] = useState<string>('default')
+  const [newIssuePrefill, setNewIssuePrefill] = useState<{
+    title?: string
+    description?: string
+    assignee?: string
+  }>({})
+
+  // Synchronize activeBoard with localStorage and URL query param
+  useEffect(() => {
+    try {
+      localStorage.setItem('hermes_active_board', activeBoard)
+      const url = new URL(window.location.href)
+      if (activeBoard === 'default') {
+        url.searchParams.delete('board')
+      } else {
+        url.searchParams.set('board', activeBoard)
+      }
+      window.history.replaceState({}, '', url.toString())
+    } catch (e) {
+      console.warn('Failed to update URL search params:', e)
+    }
+  }, [activeBoard])
 
   // Load live data from Hermes harness
-  const loadLiveData = useCallback(async () => {
+  const loadLiveData = useCallback(async (targetBoard?: string) => {
     const isHealthy = await hermesApi.checkHealth()
     setIsBackendConnected(isHealthy)
     if (!isHealthy) return
+
+    const boardToUse = targetBoard || activeBoard || 'default'
 
     try {
       // 1. Fetch live profiles
@@ -75,8 +111,33 @@ export const AppContent: React.FC = () => {
       const workers = await hermesApi.getActiveWorkers()
       setActiveWorkersCount(workers.length)
 
-      // 5. Fetch live board tasks
-      const boardData = await hermesApi.getBoard()
+      // 5. Fetch live boards (projects)
+      const liveBoards = await hermesApi.getBoards()
+      if (liveBoards.length > 0) {
+        setBoards(liveBoards)
+        setProjects(
+          liveBoards.map(b => ({
+            id: b.slug,
+            slug: b.slug,
+            name: b.name,
+            status: 'active',
+            priority: 'medium',
+            progressDone: b.counts?.done || 0,
+            progressTotal: b.total || 0,
+            lead: 'Muhammad Sigit',
+            leadAvatar: '👤',
+            createdAt: 'Active',
+            description: b.description || '',
+            default_workdir: b.default_workdir,
+            is_current: b.is_current,
+            counts: b.counts,
+            total: b.total
+          }))
+        )
+      }
+
+      // 6. Fetch live board tasks for active board
+      const boardData = await hermesApi.getBoard(boardToUse)
       if (boardData && boardData.columns) {
         const liveTasks: Task[] = []
         const statusReverseMap: Record<string, TaskStatus> = {
@@ -89,6 +150,8 @@ export const AppContent: React.FC = () => {
           blocked: 'blocked',
           done: 'done'
         }
+
+        const activeBoardObj = liveBoards.find(b => b.slug === boardToUse)
 
         boardData.columns.forEach(col => {
           col.tasks.forEach((t: any) => {
@@ -107,6 +170,16 @@ export const AppContent: React.FC = () => {
                 ? '🗄️'
                 : '🤖')
 
+            const isBlocked =
+              col.name === 'blocked' ||
+              t.status === 'blocked' ||
+              (Boolean(t.link_counts?.parents && t.link_counts.parents > 0) && col.name !== 'done')
+
+            const subtasksCount =
+              t.progress && typeof t.progress.total === 'number' && t.progress.total > 0
+                ? { done: t.progress.done || 0, total: t.progress.total }
+                : undefined
+
             liveTasks.push({
               id: t.id.replace('t_', 'DIK-'),
               rawId: t.id,
@@ -118,55 +191,66 @@ export const AppContent: React.FC = () => {
               assigneeName,
               assigneeProfile,
               assigneeAvatar,
-              projectName: 'Default Workspace',
-              projectTag: 'Cloud Operations',
-              boardSlug: 'default',
+              projectName: activeBoardObj?.name || (boardToUse === 'default' ? 'Default Workspace' : boardToUse),
+              projectTag: boardToUse,
+              boardSlug: boardToUse,
               updatedAt: 'Live',
-              reviewReport: t.result || t.latest_summary || undefined
+              reviewReport: t.result || t.latest_summary || undefined,
+              subtasksCount,
+              isBlocked,
+              linkCounts: t.link_counts
             })
           })
         })
 
         // Backend is the source of truth: when connected, show ONLY live tasks.
-        // Mock data is a placeholder for the offline state, never merged on top of
-        // live data (that produced phantom cards that don't exist in Hermes).
         setTasks(liveTasks)
       }
-
-      // 6. Fetch live boards (projects) — replace, don't merge with mock.
-      const liveBoards = await hermesApi.getBoards()
-      setProjects(liveBoards)
     } catch (e) {
       console.warn('Hermes live sync error:', e)
     }
-  }, [])
+  }, [activeBoard])
 
-  // Initial load + realtime WebSocket stream, with polling as a slower fallback.
+  // Initial load + realtime WebSocket stream for activeBoard, with polling fallback.
   useEffect(() => {
-    loadLiveData()
+    loadLiveData(activeBoard)
 
     // Debounce refreshes so a burst of events triggers a single reload.
     let debounce: ReturnType<typeof setTimeout> | null = null
     const scheduleRefresh = () => {
       if (debounce) clearTimeout(debounce)
-      debounce = setTimeout(loadLiveData, 300)
+      debounce = setTimeout(() => loadLiveData(activeBoard), 300)
     }
 
-    const disconnect = hermesApi.connectEvents(scheduleRefresh)
+    const disconnect = hermesApi.connectEvents(scheduleRefresh, activeBoard)
 
     // Fallback poll every 15s (WS handles realtime; this only backstops a dead socket).
-    const interval = setInterval(loadLiveData, 15000)
+    const interval = setInterval(() => loadLiveData(activeBoard), 15000)
 
     return () => {
       if (debounce) clearTimeout(debounce)
       disconnect()
       clearInterval(interval)
     }
-  }, [loadLiveData])
+  }, [activeBoard, loadLiveData])
 
-  // Global Keyboard shortcuts ('c' for new issue, Ctrl/Cmd+K for search)
+  // Global Keyboard shortcuts:
+  // - Ctrl/Cmd+K: Quick search
+  // - C: New Issue
+  // - B: Switch to Board view (Fase 5: TASK-5.3)
+  // - T: Switch to Table view (Fase 5: TASK-5.3)
+  // - Esc: Close any open modal/drawer (Fase 5: TASK-5.3)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
+      // Escape closes any open modal from anywhere
+      if (e.key === 'Escape') {
+        setIsSearchOpen(false)
+        setIsNewIssueOpen(false)
+        setIsNewProjectOpen(false)
+        setIsNewAutopilotOpen(false)
+        return
+      }
+
       // Ctrl/Cmd+K opens global search from anywhere (even inside inputs).
       if ((e.ctrlKey || e.metaKey) && (e.key === 'k' || e.key === 'K')) {
         e.preventDefault()
@@ -181,6 +265,14 @@ export const AppContent: React.FC = () => {
         e.preventDefault()
         setNewIssueInitialStatus('todo')
         setIsNewIssueOpen(true)
+      } else if (e.key === 'b' || e.key === 'B') {
+        e.preventDefault()
+        setViewMode('board')
+        setActiveTab(prev => (prev === 'my_issues' || prev === 'issues' ? prev : 'my_issues'))
+      } else if (e.key === 't' || e.key === 'T') {
+        e.preventDefault()
+        setViewMode('list')
+        setActiveTab(prev => (prev === 'my_issues' || prev === 'issues' ? prev : 'my_issues'))
       }
     }
 
@@ -191,6 +283,7 @@ export const AppContent: React.FC = () => {
   const handleUpdateTaskStatus = async (taskId: string, newStatus: TaskStatus) => {
     // Find the task first so we know whether it is a live (Hermes-backed) task.
     const target = tasks.find(t => t.id === taskId)
+    const boardSlug = target?.boardSlug || activeBoard || 'default'
 
     setTasks(prev =>
       prev.map(t => (t.id === taskId ? { ...t, status: newStatus, updatedAt: 'Just now' } : t))
@@ -202,7 +295,7 @@ export const AppContent: React.FC = () => {
     if (!target?.rawId) return
 
     try {
-      await hermesApi.updateTaskStatus(target.rawId, newStatus)
+      await hermesApi.updateTaskStatus(target.rawId, newStatus, boardSlug)
     } catch (err) {
       console.warn('Failed to sync task status to Hermes:', err)
       // Local state already updated; live poll will reconcile on next tick.
@@ -232,7 +325,7 @@ export const AppContent: React.FC = () => {
     profile: string
   }): Promise<boolean> => {
     const ok = await hermesApi.createCronJob(params)
-    if (ok) loadLiveData()
+    if (ok) loadLiveData(activeBoard)
     return ok
   }
 
@@ -240,10 +333,25 @@ export const AppContent: React.FC = () => {
     slug: string
     name: string
     description: string
+    default_workdir?: string
+    switch?: boolean
   }): Promise<boolean> => {
     const ok = await hermesApi.createBoard(params)
-    if (ok) loadLiveData()
+    if (ok) {
+      if (params.switch) {
+        setActiveBoard(params.slug)
+        loadLiveData(params.slug)
+      } else {
+        loadLiveData(activeBoard)
+      }
+    }
     return ok
+  }
+
+  const handleSelectProject = (slug: string) => {
+    setActiveBoard(slug)
+    setActiveTab('my_issues')
+    loadLiveData(slug)
   }
 
   const handleSendComment = async (taskId: string, note: string): Promise<boolean> => {
@@ -303,6 +411,7 @@ export const AppContent: React.FC = () => {
     let rawId = target.rawId
     const boardSlug =
       target.boardSlug ||
+      activeBoard ||
       projects.find(p => p.name === target?.projectName)?.id ||
       'default'
     const profile =
@@ -389,6 +498,7 @@ export const AppContent: React.FC = () => {
         // Map the selected project to its board slug
         const boardSlug =
           taskData.boardSlug ||
+          activeBoard ||
           projects.find(p => p.name === taskData.projectName)?.id ||
           'default'
 
@@ -410,6 +520,16 @@ export const AppContent: React.FC = () => {
         console.warn('Task created in local UI only:', err)
       }
     }
+  }
+
+  const handleConvertChatToIssue = (issueData: { title: string; description: string; assignee?: string }) => {
+    setNewIssuePrefill({
+      title: issueData.title,
+      description: issueData.description,
+      assignee: issueData.assignee
+    })
+    setNewIssueInitialStatus('todo')
+    setIsNewIssueOpen(true)
   }
 
   const unreadInboxCount = tasks.filter(t => t.status === 'in_review').length
@@ -435,6 +555,13 @@ export const AppContent: React.FC = () => {
           viewMode={viewMode}
           onToggleViewMode={setViewMode}
           activeWorkersCount={activeWorkersCount}
+          boards={boards}
+          activeBoard={activeBoard}
+          onSelectBoard={slug => {
+            setActiveBoard(slug)
+            loadLiveData(slug)
+          }}
+          onNewBoard={() => setIsNewProjectOpen(true)}
         />
 
         {/* Tab View Router */}
@@ -443,6 +570,8 @@ export const AppContent: React.FC = () => {
             <KanbanBoard
               tasks={tasks}
               agents={agents}
+              activeBoard={activeBoard}
+              activeBoardName={boards.find(b => b.slug === activeBoard)?.name || activeBoard}
               onUpdateTaskStatus={handleUpdateTaskStatus}
               onOpenNewIssue={status => {
                 setNewIssueInitialStatus(status || 'todo')
@@ -450,6 +579,7 @@ export const AppContent: React.FC = () => {
               }}
               onRunAgent={handleRunAgent}
               onSendComment={handleSendComment}
+              onRefreshTasks={() => loadLiveData(activeBoard)}
             />
           )}
 
@@ -457,6 +587,8 @@ export const AppContent: React.FC = () => {
             <KanbanBoard
               tasks={tasks}
               agents={agents}
+              activeBoard={activeBoard}
+              activeBoardName={boards.find(b => b.slug === activeBoard)?.name || activeBoard}
               onUpdateTaskStatus={handleUpdateTaskStatus}
               onOpenNewIssue={status => {
                 setNewIssueInitialStatus(status || 'todo')
@@ -464,6 +596,7 @@ export const AppContent: React.FC = () => {
               }}
               onRunAgent={handleRunAgent}
               onSendComment={handleSendComment}
+              onRefreshTasks={() => loadLiveData(activeBoard)}
             />
           )}
 
@@ -473,11 +606,18 @@ export const AppContent: React.FC = () => {
               onApproveTask={handleApproveTask}
               onRequestChanges={handleRequestChanges}
               onSendComment={handleSendComment}
+              onRefreshTasks={() => loadLiveData(activeBoard)}
             />
           )}
 
           {activeTab === 'projects' && (
-            <ProjectsView projects={projects} onNewProject={() => setIsNewProjectOpen(true)} />
+            <ProjectsView
+              projects={boards.length > 0 ? boards : projects}
+              activeBoard={activeBoard}
+              onSelectProject={handleSelectProject}
+              onNewProject={() => setIsNewProjectOpen(true)}
+              onRefreshProjects={() => loadLiveData(activeBoard)}
+            />
           )}
 
           {activeTab === 'autopilot' && (
@@ -489,19 +629,48 @@ export const AppContent: React.FC = () => {
             />
           )}
 
-          {activeTab === 'agents' && <AgentsView agents={agents} />}
+          {activeTab === 'agents' && (
+            <AgentsView
+              agents={agents}
+              tasks={tasks}
+              onRefreshAgents={() => loadLiveData(activeBoard)}
+              onSelectAgentForChat={(agentId) => {
+                setChatInitialProfile(agentId)
+                setActiveTab('chat')
+              }}
+            />
+          )}
 
-          {activeTab === 'squads' && <SquadsView squads={squads} />}
+          {activeTab === 'squads' && (
+            <SquadsView
+              squads={squads}
+              agents={agents}
+              onRefresh={() => loadLiveData(activeBoard)}
+            />
+          )}
 
-          {activeTab === 'skills' && <SkillsView skills={skills} />}
+          {activeTab === 'skills' && (
+            <SkillsView
+              skills={skills}
+              onRefreshSkills={() => loadLiveData(activeBoard)}
+            />
+          )}
 
-          {['chat', 'settings'].includes(activeTab) && (
+          {activeTab === 'chat' && (
+            <ChatView
+              agents={agents}
+              initialProfile={chatInitialProfile}
+              onConvertToIssue={handleConvertChatToIssue}
+            />
+          )}
+
+          {activeTab === 'settings' && (
             <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
               <div className="p-4 rounded-full bg-slate-100 dark:bg-slate-800/80 mb-3 text-2xl">
                 ⚙️
               </div>
               <h3 className="text-sm font-semibold capitalize text-slate-700 dark:text-slate-200">
-                {activeTab} Management
+                Settings Management
               </h3>
               <p className="text-xs text-slate-500 mt-1 max-w-sm">
                 Modul ini terhubung ke Hermes Profile Engine.
@@ -514,9 +683,19 @@ export const AppContent: React.FC = () => {
       {/* New Issue Modal */}
       <NewIssueModal
         isOpen={isNewIssueOpen}
-        onClose={() => setIsNewIssueOpen(false)}
-        onSaveTask={handleSaveNewTask}
+        onClose={() => {
+          setIsNewIssueOpen(false)
+          setNewIssuePrefill({})
+        }}
+        onSaveTask={(task, runImmediately) => {
+          handleSaveNewTask(task, runImmediately)
+          setNewIssuePrefill({})
+        }}
         initialStatus={newIssueInitialStatus}
+        initialTitle={newIssuePrefill.title}
+        initialDescription={newIssuePrefill.description}
+        initialAssignee={newIssuePrefill.assignee}
+        initialBoardSlug={activeBoard}
         agents={agents}
         projects={projects}
       />
@@ -544,15 +723,66 @@ export const AppContent: React.FC = () => {
         isOpen={isNewProjectOpen}
         onClose={() => setIsNewProjectOpen(false)}
         onCreate={handleCreateProject}
+        existingBoards={boards.length > 0 ? boards : projects}
+        onSelectBoard={slug => {
+          setActiveBoard(slug)
+          loadLiveData(slug)
+        }}
+        onRefreshBoards={() => loadLiveData(activeBoard)}
       />
     </div>
   )
 }
 
+class ErrorBoundary extends React.Component<
+  { children: React.ReactNode },
+  { hasError: boolean; error: Error | null }
+> {
+  constructor(props: { children: React.ReactNode }) {
+    super(props)
+    this.state = { hasError: false, error: null }
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error }
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error('Hermes Hub React Caught Error:', error, errorInfo)
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-screen w-screen flex-col items-center justify-center bg-[#0D0F12] text-slate-100 p-6 text-center">
+          <div className="max-w-md p-6 rounded-xl border border-rose-500/30 bg-[#16191E] space-y-4 shadow-2xl">
+            <h2 className="text-base font-bold text-rose-500">Something went wrong</h2>
+            <p className="text-xs text-slate-400 font-mono text-left bg-black/50 p-3 rounded overflow-auto max-h-40">
+              {this.state.error?.message || 'Unknown error occurred'}
+            </p>
+            <button
+              onClick={() => {
+                this.setState({ hasError: false, error: null })
+                window.location.reload()
+              }}
+              className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-500 text-xs font-semibold text-white cursor-pointer"
+            >
+              Reload Application
+            </button>
+          </div>
+        </div>
+      )
+    }
+    return this.props.children
+  }
+}
+
 export default function App() {
   return (
     <ThemeProvider>
-      <AppContent />
+      <ErrorBoundary>
+        <AppContent />
+      </ErrorBoundary>
     </ThemeProvider>
   )
 }

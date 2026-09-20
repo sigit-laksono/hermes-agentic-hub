@@ -4,15 +4,48 @@ export const initialTasks: Task[] = [
   {
     id: 'DIK-55',
     title: 'Cek static Routing',
-    description: 'Verifikasi konfigurasi static route pada VPC peering dan transit gateway.',
+    description: `[17/09, 10:37] Goemie Kpc: mas
+[17/09, 10:37] Goemie Kpc: ada request akses aws kpc (hses) ke segmen jakarta
+[17/09, 10:38] Sigit: Segmen jakarta boleh di info mas
+[17/09, 10:38] Sigit: Biar aku cek static route di awsnya mas
+[17/09, 10:41] Goemie Kpc: 10.6.0.0/16
+10.100.105.0/24
+10.2.1.0/24
+10.2.10.0/24
+10.7.1.0/24
+10.70.10.0/24
+[17/09, 10:41] Sigit: Aku cek dulu ya mas
+
+Bantu saya cek routing static di vpc kpc bukan yang kimper,`,
     status: 'in_review',
     priority: 'medium',
     assigneeType: 'agent',
     assigneeName: 'AWS Cloud Operations',
+    assigneeProfile: 'sa-aws',
     assigneeAvatar: '⚡',
     projectName: 'KPC-Cloud-Managed Services',
     updatedAt: '2d ago',
-    reviewReport: '### Laporan Hasil Verifikasi Static Routing\n- **Status Peering:** Active\n- **Route Table ID:** rtb-03ab921c\n- **Target CIDR:** 10.200.0.0/16 via tgw-0987af\n- **Rekomendasi:** Konfigurasi telah sesuai standar keamanan DikstraCloud.'
+    reviewReport: '### Laporan Hasil Verifikasi Static Routing\n- **Status Peering:** Active\n- **Route Table ID:** rtb-03ab921c\n- **Target CIDR:** 10.200.0.0/16 via tgw-0987af\n- **Rekomendasi:** Konfigurasi telah sesuai standar keamanan DikstraCloud.',
+    attachments: [
+      {
+        id: 101,
+        task_id: 'DIK-55',
+        filename: 'vpc-peering-routes.tf',
+        content_type: 'text/plain',
+        size: 3420,
+        uploaded_by: 'sa-aws',
+        created_at: Math.floor(Date.now() / 1000) - 86400
+      },
+      {
+        id: 102,
+        task_id: 'DIK-55',
+        filename: 'route-table-verification.md',
+        content_type: 'text/markdown',
+        size: 1840,
+        uploaded_by: 'sa-aws',
+        created_at: Math.floor(Date.now() / 1000) - 86000
+      }
+    ]
   },
   {
     id: 'DIK-35',
@@ -53,7 +86,27 @@ export const initialTasks: Task[] = [
     assigneeAvatar: '🤖',
     projectName: 'KPC-Cloud-Managed Services',
     updatedAt: '1d ago',
-    reviewReport: 'Diagram topologi arsitektur telah selesai dibuat dalam format Mermaid & Excalidraw.'
+    reviewReport: 'Diagram topologi arsitektur telah selesai dibuat dalam format Mermaid & Excalidraw.',
+    attachments: [
+      {
+        id: 103,
+        task_id: 'DIK-58',
+        filename: 'aws-transit-gateway-topology.svg',
+        content_type: 'image/svg+xml',
+        size: 15200,
+        uploaded_by: 'sa-aws',
+        created_at: Math.floor(Date.now() / 1000) - 43200
+      },
+      {
+        id: 104,
+        task_id: 'DIK-58',
+        filename: 'tgw-attachment-config.yaml',
+        content_type: 'text/yaml',
+        size: 2150,
+        uploaded_by: 'sa-aws',
+        created_at: Math.floor(Date.now() / 1000) - 43000
+      }
+    ]
   },
   {
     id: 'DIK-56',

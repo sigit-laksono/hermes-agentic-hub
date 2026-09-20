@@ -7,6 +7,10 @@ interface NewIssueModalProps {
   onClose: () => void
   onSaveTask: (task: Omit<Task, 'id' | 'updatedAt'>, runImmediately?: boolean) => void
   initialStatus?: TaskStatus
+  initialTitle?: string
+  initialDescription?: string
+  initialAssignee?: string
+  initialBoardSlug?: string
   agents?: AIAgent[]
   projects?: Project[]
 }
@@ -16,33 +20,45 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
   onClose,
   onSaveTask,
   initialStatus = 'todo',
+  initialTitle = '',
+  initialDescription = '',
+  initialAssignee = '',
+  initialBoardSlug = 'default',
   agents = [],
   projects = []
 }) => {
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
+  const [title, setTitle] = useState(initialTitle)
+  const [description, setDescription] = useState(initialDescription)
   const [status, setStatus] = useState<TaskStatus>(initialStatus)
   const [priority, setPriority] = useState<Priority>('medium')
-  const [assigneeProfile, setAssigneeProfile] = useState('')
-  const [projectSlug, setProjectSlug] = useState('')
+  const [assigneeProfile, setAssigneeProfile] = useState(initialAssignee)
+  const [projectSlug, setProjectSlug] = useState(initialBoardSlug)
   const [runImmediately, setRunImmediately] = useState(true)
 
   // Initialize and synchronize defaults whenever modal opens or lists update
   useEffect(() => {
     if (isOpen) {
-      if (agents.length > 0 && (!assigneeProfile || !agents.some(a => a.id === assigneeProfile))) {
+      if (initialTitle) setTitle(initialTitle)
+      if (initialDescription) setDescription(initialDescription)
+      if (initialStatus) setStatus(initialStatus)
+
+      if (initialAssignee) {
+        setAssigneeProfile(initialAssignee)
+      } else if (agents.length > 0 && (!assigneeProfile || !agents.some(a => a.id === assigneeProfile))) {
         setAssigneeProfile(agents[0].id)
       } else if (!assigneeProfile) {
         setAssigneeProfile('sa-aws')
       }
 
-      if (projects.length > 0 && (!projectSlug || !projects.some(p => p.id === projectSlug))) {
+      if (initialBoardSlug) {
+        setProjectSlug(initialBoardSlug)
+      } else if (projects.length > 0 && (!projectSlug || !projects.some(p => p.id === projectSlug))) {
         setProjectSlug(projects[0].id)
       } else if (!projectSlug) {
         setProjectSlug('default')
       }
     }
-  }, [isOpen, agents, projects])
+  }, [isOpen, agents, projects, initialTitle, initialDescription, initialAssignee, initialStatus, initialBoardSlug])
 
   if (!isOpen) return null
 

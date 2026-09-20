@@ -32,24 +32,32 @@
 * **🎨 Linear / Multica Aesthetic UI:**
   * High-contrast Dark Mode (`#0D0F12`), Clean Light Mode, and System theme toggle.
   * Keyboard-centric shortcuts (`C` for New Issue, `Ctrl+K` / `Cmd+K` for Global Search).
+  * Robust `<ErrorBoundary>` integration preventing blank screens on unexpected errors.
 * **📋 Interactive Kanban Board:**
   * 6 workflow stages: `Backlog`, `Todo`, `In Progress`, `In Review`, `Blocked`, and `Done`.
   * Native HTML5 Drag-and-Drop column transitions without third-party heavy libraries.
   * Instant **Run Agent** dispatch button directly from issue cards.
-* **🔍 Task Detail Modal & Live Terminal:**
-  * Realtime terminal execution logs streamed directly from the agent worker.
-  * Full inspectability: Task Overview, Assignee metadata, and Interactive Notes thread.
-* **📥 Human-in-the-Loop (HITL) Inbox:**
-  * Two-pane review center for inspecting agent output reports.
-  * One-click **Approve & Done**, or **Request Changes** with feedback/revision instructions sent directly to Hermes.
+* **🔍 Multica Issue Detail Drawer & Live Observability:**
+  * Native two-column layout matching Linear / Multica design system with collapsible Properties sidebar.
+  * **Dynamic Activity Stream:** Real-time event tracking from Hermes engine (`task_events`) and live comment thread (`task_comments`) with direct posting.
+  * **Run Inspector & Host Telemetry:** Live `psutil` metrics (CPU % gauge, RAM RSS in MB, PID, threads, heartbeat).
+  * **Emergency Stop / Terminate Worker:** Direct worker process termination via SIGTERM/SIGKILL (`/runs/{id}/terminate`).
+  * **Execution Log & Timeline Trace Drawer:** Chronological tool step trace (`Bash / PowerShell`, `kanban_*`, `skill_*`), model vs tools timeline breakdown, search filter, and agent final report.
+* **📎 Deliverables & Work Artifacts Management:**
+  * Categorized file cards for Terraform (`.tf`), CloudFormation/Config (`.yaml`, `.json`), Documentation (`.md`), and Architecture Diagrams (`.svg`, `.png`).
+  * Built-in in-app code and spec previewer with line numbers, copy button, and direct download.
+* **📥 Human-in-the-Loop (HITL) Inbox Review Center:**
+  * Dual-tab review workspace: **Executive Summary** vs **Deliverables & Files**.
+  * Pre-approval code/artifact inspection before issuing **Approve & Done** or **Request Changes**.
 * **🤖 Autonomous AI Team Fleet:**
   * Multi-profile management: `sa-aws` (AWS Solutions Architect), `sa-microsoft` (Azure Specialist), `technical-writer`, `database-engineer`, and `default`.
   * Dynamic assignee and project mapping reflecting live server configuration.
 * **⚡ Autopilot (Hermes Cron Engine):**
   * Schedule, monitor, trigger immediately (*Run now*), or toggle (*Pause / Resume*) automated recurring tasks.
-* **🌐 Enterprise Networking:**
+* **🌐 Enterprise Networking & Universal Paths:**
   * Seamless Vite `/api` reverse proxying to FastAPI backend bridge on port `9120`.
   * Realtime event streaming via Hermes WebSocket `/events`.
+  * Universal path resolution supporting `~/.hermes/...` across any Linux/WSL user environment.
 
 ---
 
@@ -126,7 +134,7 @@ hermes-agentic-hub/
 ### 2. Run Backend Bridge
 ```bash
 # Activate Hermes Python environment and run bridge
-/home/ubuntu/.hermes/hermes-agent/venv/bin/python server.py
+~/.hermes/hermes-agent/venv/bin/python server.py
 # Backend runs at http://127.0.0.1:9120
 ```
 

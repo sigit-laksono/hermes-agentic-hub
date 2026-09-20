@@ -7,18 +7,24 @@ import {
   Tag,
   ArrowRight,
   Play,
-  Loader2
+  Loader2,
+  Lock,
+  ListChecks
 } from 'lucide-react'
 import { Task, TaskStatus, AIAgent } from '../types'
 import { TaskDetailModal } from './TaskDetailModal'
+import { FolderGit2 } from 'lucide-react'
 
 interface KanbanBoardProps {
   tasks: Task[]
   agents?: AIAgent[]
+  activeBoard?: string
+  activeBoardName?: string
   onUpdateTaskStatus: (taskId: string, newStatus: TaskStatus) => void
   onOpenNewIssue: (initialStatus?: TaskStatus) => void
   onRunAgent: (taskId: string) => Promise<boolean | void>
   onSendComment?: (taskId: string, note: string) => Promise<boolean> | boolean
+  onRefreshTasks?: () => Promise<void> | void
 }
 
 const columns: { id: TaskStatus; title: string; color: string; bgBadge: string }[] = [
@@ -33,17 +39,22 @@ const columns: { id: TaskStatus; title: string; color: string; bgBadge: string }
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   tasks,
   agents = [],
+  activeBoard = 'default',
+  activeBoardName,
   onUpdateTaskStatus,
   onOpenNewIssue,
   onRunAgent,
-  onSendComment
+  onSendComment,
+  onRefreshTasks
 }) => {
   const [filterType, setFilterType] = useState<'all' | 'members' | 'agents'>('all')
   // Native HTML5 drag-and-drop state (no external dependency).
   const [draggingId, setDraggingId] = useState<string | null>(null)
   const [dragOverCol, setDragOverCol] = useState<TaskStatus | null>(null)
-  const [selectedTaskForDetail, setSelectedTaskForDetail] = useState<Task | null>(null)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [runningTaskId, setRunningTaskId] = useState<string | null>(null)
+
+  const selectedTask = selectedTaskId ? tasks.find(t => t.id === selectedTaskId) || null : null
 
   const filteredTasks = tasks.filter(t => {
     if (filterType === 'members') return t.assigneeType === 'member'
@@ -87,38 +98,49 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   return (
     <div className="flex-1 flex flex-col h-[calc(100vh-3rem)] overflow-hidden bg-slate-50/50 dark:bg-[#0D0F12]">
       {/* Sub-header Filters */}
-      <div className="px-4 py-2 border-b border-slate-200 dark:border-[#23272F] flex items-center gap-2 text-xs">
-        <div className="flex items-center p-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300/60 dark:border-slate-700/60">
-          <button
-            onClick={() => setFilterType('all')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              filterType === 'all'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            All
-          </button>
-          <button
-            onClick={() => setFilterType('members')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              filterType === 'members'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            Members
-          </button>
-          <button
-            onClick={() => setFilterType('agents')}
-            className={`px-2.5 py-1 rounded text-xs font-medium transition-colors ${
-              filterType === 'agents'
-                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
-                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
-            }`}
-          >
-            Agents
-          </button>
+      <div className="px-4 py-2 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between text-xs">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center p-0.5 rounded-md bg-slate-200/80 dark:bg-slate-800/80 border border-slate-300/60 dark:border-slate-700/60">
+            <button
+              onClick={() => setFilterType('all')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                filterType === 'all'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              All
+            </button>
+            <button
+              onClick={() => setFilterType('members')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                filterType === 'members'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Members
+            </button>
+            <button
+              onClick={() => setFilterType('agents')}
+              className={`px-2.5 py-1 rounded text-xs font-medium transition-colors cursor-pointer ${
+                filterType === 'agents'
+                  ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-xs'
+                  : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+              }`}
+            >
+              Agents
+            </button>
+          </div>
+        </div>
+
+        {/* Board indicator tag */}
+        <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] bg-white dark:bg-[#14171D] border border-slate-200 dark:border-[#282D37] text-slate-600 dark:text-slate-400">
+          <FolderGit2 className="w-3.5 h-3.5 text-blue-500" />
+          <span>Board:</span>
+          <span className="font-semibold font-mono text-slate-900 dark:text-white">
+            {activeBoardName || activeBoard}
+          </span>
         </div>
       </div>
 
@@ -182,30 +204,60 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       draggable
                       onDragStart={e => handleDragStart(e, task.id)}
                       onDragEnd={handleDragEnd}
-                      onClick={() => setSelectedTaskForDetail(task)}
+                      onClick={() => setSelectedTaskId(task.id)}
                       className={`p-3 rounded-md bg-white dark:bg-[#1A1D24] border border-slate-200 dark:border-[#282D37] shadow-xs hover:border-blue-500/50 dark:hover:border-blue-500/50 transition-all group cursor-grab active:cursor-grabbing ${
                         draggingId === task.id ? 'opacity-40' : ''
                       }`}
                     >
-                      {/* Top meta: ID + Priority */}
+                      {/* Top meta: ID + Priority + Blocked */}
                       <div className="flex items-center justify-between text-[11px] text-slate-400 mb-1.5">
                         <span className="font-mono font-medium text-slate-500 dark:text-slate-400">
                           {task.id}
                         </span>
-                        {task.priority === 'urgent' && (
-                          <span className="flex items-center gap-1 text-rose-500 font-semibold">
-                            <AlertCircle className="w-3 h-3" /> Urgent
-                          </span>
-                        )}
-                        {task.priority === 'high' && (
-                          <span className="text-amber-500 font-medium">High</span>
-                        )}
+                        <div className="flex items-center gap-1">
+                          {task.isBlocked && task.status !== 'done' && (
+                            <span
+                              className="inline-flex items-center gap-0.5 text-[10px] font-semibold text-rose-500 bg-rose-500/10 px-1.5 py-0.2 rounded border border-rose-500/20"
+                              title="Task is blocked by incomplete parent dependencies"
+                            >
+                              <Lock className="w-2.5 h-2.5" />
+                              <span>Blocked</span>
+                            </span>
+                          )}
+                          {task.priority === 'urgent' && (
+                            <span className="flex items-center gap-1 text-rose-500 font-semibold">
+                              <AlertCircle className="w-3 h-3" /> Urgent
+                            </span>
+                          )}
+                          {task.priority === 'high' && (
+                            <span className="text-amber-500 font-medium">High</span>
+                          )}
+                        </div>
                       </div>
 
                       {/* Title */}
                       <h4 className="text-xs font-medium text-slate-800 dark:text-slate-100 leading-snug line-clamp-2 mb-2">
                         {task.title}
                       </h4>
+
+                      {/* Subtasks Progress Indicator (Fase 1: TASK-1.3) */}
+                      {task.subtasksCount && task.subtasksCount.total > 0 && (
+                        <div className="mb-2 p-1.5 rounded bg-slate-100 dark:bg-[#15171E] border border-slate-200/60 dark:border-[#222733]">
+                          <div className="flex items-center justify-between text-[10px] font-mono mb-1 text-slate-500 dark:text-slate-400">
+                            <span className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 font-medium">
+                              <ListChecks className="w-2.5 h-2.5" />
+                              <span>{task.subtasksCount.done}/{task.subtasksCount.total} subtasks</span>
+                            </span>
+                            <span>{Math.round((task.subtasksCount.done / task.subtasksCount.total) * 100)}%</span>
+                          </div>
+                          <div className="w-full bg-slate-200 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
+                            <div
+                              className="bg-blue-500 h-full rounded-full transition-all"
+                              style={{ width: `${(task.subtasksCount.done / task.subtasksCount.total) * 100}%` }}
+                            />
+                          </div>
+                        </div>
+                      )}
 
                       {/* Project Tag */}
                       {task.projectTag && (
@@ -298,15 +350,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
       </div>
 
       {/* Task Detail Modal */}
-      <TaskDetailModal
-        isOpen={!!selectedTaskForDetail}
-        onClose={() => setSelectedTaskForDetail(null)}
-        task={selectedTaskForDetail}
-        agents={agents}
-        onUpdateStatus={onUpdateTaskStatus}
-        onRunAgent={onRunAgent}
-        onSendComment={onSendComment || (() => false)}
-      />
+      {selectedTask && (
+        <TaskDetailModal
+          isOpen={!!selectedTask}
+          onClose={() => setSelectedTaskId(null)}
+          task={selectedTask}
+          agents={agents}
+          allTasks={tasks}
+          activeBoard={activeBoard}
+          onUpdateStatus={onUpdateTaskStatus}
+          onRunAgent={onRunAgent}
+          onSendComment={onSendComment || (() => false)}
+          onRefreshTasks={onRefreshTasks}
+        />
+      )}
     </div>
   )
 }

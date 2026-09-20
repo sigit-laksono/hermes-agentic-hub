@@ -103,11 +103,15 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div
             onClick={() => onSelectTab('my_issues')}
             className={navItemClass('my_issues')}
+            title="My Issues (Press B for Board, T for Table)"
           >
             <div className="flex items-center gap-2">
               <CheckSquare className="w-3.5 h-3.5 text-slate-500" />
               <span>My Issues</span>
             </div>
+            <kbd className="text-[9px] px-1 rounded bg-slate-200/70 dark:bg-slate-800/80 font-mono text-slate-400">
+              B
+            </kbd>
           </div>
 
           <div
@@ -202,6 +206,18 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Keyboard Shortcuts Hint Bar (Fase 5: TASK-5.3) */}
+      <div className="px-3 py-2 border-t border-slate-200/70 dark:border-[#20242E] text-[10px] text-slate-500 dark:text-slate-400 flex items-center justify-between select-none">
+        <span className="flex items-center gap-1 font-mono text-[10px]">
+          <kbd className="px-1 py-0.2 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">B</kbd> Board
+          <span>•</span>
+          <kbd className="px-1 py-0.2 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">T</kbd> Table
+        </span>
+        <span className="flex items-center gap-1 font-mono text-[10px]">
+          <kbd className="px-1 py-0.2 rounded bg-slate-200/70 dark:bg-slate-800 text-slate-600 dark:text-slate-300">Esc</kbd> Close
+        </span>
       </div>
 
       {/* Footer */}

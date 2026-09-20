@@ -7,3 +7,5 @@ dist-ssr
 server.log
 __pycache__/
 *.pyc
+.claude/
+graphify-out/
