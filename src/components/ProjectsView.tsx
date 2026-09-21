@@ -142,16 +142,16 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       {/* Header */}
       <div className="p-4 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <FolderGit2 className="w-4 h-4 text-blue-500" />
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2 font-display">
+            <FolderGit2 className="w-4 h-4 text-[#F97316]" />
             Projects & Workspaces
-            <span className="text-xs font-normal text-slate-400">({projects.length} boards)</span>
+            <span className="text-xs font-normal text-slate-400 font-mono">({projects.length} boards)</span>
           </h2>
         </div>
 
         <button
           onClick={onNewProject}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white transition-colors shadow-xs cursor-pointer"
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white transition-all shadow-xs shadow-orange-500/20 cursor-pointer active:scale-95"
         >
           <Plus className="w-3.5 h-3.5" />
           <span>New Project Board</span>
@@ -159,7 +159,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
       </div>
 
       {/* Filter toolbar */}
-      <div className="px-4 py-2 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between text-xs bg-slate-50/50 dark:bg-[#111317]">
+      <div className="px-4 py-2.5 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between text-xs bg-slate-50/50 dark:bg-[#14161B]">
         <div className="flex items-center gap-2">
           <div className="relative">
             <Search className="w-3.5 h-3.5 absolute left-2.5 top-2 text-slate-400" />
@@ -168,7 +168,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search projects by name, slug, or context..."
-              className="pl-8 pr-3 py-1 rounded-md border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#16191E] text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 w-64"
+              className="pl-8 pr-3 py-1.5 rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] text-xs text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#F97316] w-72 transition-colors"
             />
           </div>
         </div>
@@ -213,8 +213,8 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   onClick={() => onSelectProject(slug)}
                   className={`transition-colors cursor-pointer group ${
                     isCurrent
-                      ? 'bg-blue-50/50 dark:bg-blue-950/20 hover:bg-blue-50/80 dark:hover:bg-blue-950/30'
-                      : 'hover:bg-slate-50 dark:hover:bg-[#16191E]'
+                      ? 'bg-orange-500/10 dark:bg-orange-950/30 hover:bg-orange-500/15 dark:hover:bg-orange-950/40'
+                      : 'hover:bg-slate-50 dark:hover:bg-white/5'
                   }`}
                 >
                   {/* Name & Active Badge */}
@@ -223,11 +223,11 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       <span className="text-base">{isCurrent ? '📂' : '📁'}</span>
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="font-semibold text-slate-900 dark:text-white group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                          <span className="font-semibold text-slate-900 dark:text-white group-hover:text-[#F97316] transition-colors font-display">
                             {proj.name}
                           </span>
                           {isCurrent && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500 text-white shadow-2xs">
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-[#F97316] text-white shadow-2xs font-mono">
                               Active Board
                             </span>
                           )}
@@ -307,7 +307,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       <button
                         onClick={() => onSelectProject(slug)}
                         title="Switch to this Kanban Board"
-                        className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium text-blue-600 dark:text-blue-400 hover:bg-blue-100/60 dark:hover:bg-blue-950/40 transition-colors cursor-pointer"
+                        className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold text-[#F97316] hover:bg-orange-500/10 transition-colors cursor-pointer"
                       >
                         <span>Open Board</span>
                         <ArrowUpRight className="w-3.5 h-3.5" />
@@ -323,26 +323,26 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
 
       {/* Project Shared Context Editor Modal / Drawer */}
       {editingProject && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-          <div className="w-full max-w-2xl rounded-xl border border-slate-200 dark:border-[#282D37] bg-white dark:bg-[#16191E] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 font-body">
+          <div className="w-full max-w-2xl rounded-2xl border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-[90vh]">
             {/* Modal Header */}
-            <div className="p-4 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between bg-slate-50/50 dark:bg-[#111317]">
+            <div className="p-4 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between bg-slate-50/50 dark:bg-[#14161B]">
               <div className="flex items-center gap-2.5">
-                <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-500">
+                <div className="p-2 rounded-lg bg-orange-500/10 text-[#F97316]">
                   <SlidersHorizontal className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="font-semibold text-slate-900 dark:text-white text-sm">
+                  <h3 className="font-semibold text-slate-900 dark:text-white text-sm font-display">
                     Project Shared Context & Architecture Guidelines
                   </h3>
                   <p className="text-[11px] text-slate-500">
-                    Board Slug: <span className="font-mono text-blue-500 font-semibold">{editingProject.slug || editingProject.id || ''}</span>
+                    Board Slug: <span className="font-mono text-[#F97316] font-semibold">{editingProject.slug || editingProject.id || ''}</span>
                   </p>
                 </div>
               </div>
               <button
                 onClick={() => setEditingProject(null)}
-                className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -360,7 +360,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     required
                     value={editName}
                     onChange={e => setEditName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                    className="w-full px-3.5 py-2 text-xs rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none focus:border-[#F97316]"
                   />
                 </div>
                 <div>
@@ -372,7 +372,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                     value={editWorkdir}
                     onChange={e => setEditWorkdir(e.target.value)}
                     placeholder="e.g. /home/sigit/projects/infra"
-                    className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500 font-mono"
+                    className="w-full px-3.5 py-2 text-xs rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none focus:border-[#F97316] font-mono"
                   />
                 </div>
               </div>
@@ -391,7 +391,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                 {/* Quick Preset Chips */}
                 <div className="mb-2 flex items-center gap-1.5 flex-wrap">
                   <span className="text-[10px] text-slate-400 flex items-center gap-1">
-                    <Sparkles className="w-3 h-3 text-amber-500" /> Presets:
+                    <Sparkles className="w-3 h-3 text-[#F97316]" /> Presets:
                   </span>
                   {PRESETS.map(preset => (
                     <button
@@ -400,7 +400,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                       onClick={() => {
                         setEditDescription(prev => (prev ? `${prev}\n\n${preset.text}` : preset.text))
                       }}
-                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[11px] bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-[11px] bg-slate-100 dark:bg-[#14161B] hover:bg-orange-500/10 text-slate-700 dark:text-slate-300 hover:text-[#F97316] dark:hover:text-[#FB923C] border border-[#E7E5E4] dark:border-[#2A2524] transition-colors cursor-pointer font-mono"
                     >
                       <span>{preset.icon}</span>
                       <span>{preset.name}</span>
@@ -413,16 +413,16 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
                   value={editDescription}
                   onChange={e => setEditDescription(e.target.value)}
                   placeholder="Gunakan Terraform AWS Provider v5+, penamaan resource format kpc-prod-*, pastikan semua security group egress dibatasi..."
-                  className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-y leading-relaxed"
+                  className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#F97316] resize-y leading-relaxed"
                 />
               </div>
 
               {/* Explanation note */}
-              <div className="p-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 flex items-start gap-2.5 text-xs text-blue-700 dark:text-blue-300">
-                <Info className="w-4 h-4 text-blue-500 shrink-0 mt-0.5" />
+              <div className="p-3.5 rounded-xl bg-orange-50/60 dark:bg-orange-950/20 border border-orange-200/60 dark:border-orange-900/40 flex items-start gap-2.5 text-xs text-orange-800 dark:text-[#FDBA74]">
+                <Info className="w-4 h-4 text-[#F97316] shrink-0 mt-0.5" />
                 <div className="text-[11px] leading-relaxed">
                   <strong>Hermes Multi-Board Isolation:</strong> Deskripsi ini disimpan secara permanen di{' '}
-                  <code className="font-mono text-blue-600 dark:text-blue-400">~/.hermes/kanban/boards/&lt;slug&gt;/board.json</code>.
+                  <code className="font-mono text-[#F97316] dark:text-[#FB923C]">~/.hermes/kanban/boards/&lt;slug&gt;/board.json</code>.
                   Setiap kali agen mengeksekusi tiket di board ini (misal via <em>AI Specify</em>, <em>AI Decompose</em>, atau <em>Run Agent</em>),
                   instruksi ini secara otomatis disuntikkan ke dalam sistem prompt LLM.
                 </div>
@@ -431,7 +431,7 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
               {/* Feedback Alert */}
               {saveNotice && (
                 <div
-                  className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+                  className={`p-3 rounded-xl text-xs flex items-center gap-2 ${
                     saveNotice.type === 'success'
                       ? 'bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800'
                       : 'bg-rose-50 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 border border-rose-200 dark:border-rose-800'
@@ -447,18 +447,18 @@ export const ProjectsView: React.FC<ProjectsViewProps> = ({
               )}
 
               {/* Action Buttons */}
-              <div className="pt-3 border-t border-slate-200 dark:border-[#23272F] flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={() => setEditingProject(null)}
-                  className="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
                 >
                   Close
                 </button>
                 <button
                   type="submit"
                   disabled={isSavingContext}
-                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white shadow-xs shadow-orange-500/20 disabled:opacity-50 cursor-pointer transition-all active:scale-95"
                 >
                   {isSavingContext ? (
                     <Loader2 className="w-3.5 h-3.5 animate-spin" />

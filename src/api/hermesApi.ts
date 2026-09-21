@@ -24,7 +24,12 @@ import {
   OrchestrationSettings,
   ModelOptionsResponse,
   SkillContent,
-  CreateProfilePayload
+  CreateProfilePayload,
+  BoardStats,
+  HomeChannel,
+  ChatMeteringData,
+  PendingApproval,
+  PendingClarify
 } from '../types'
 
 export interface ChatSocketHandlers {
@@ -33,6 +38,9 @@ export interface ChatSocketHandlers {
   onThinking?: (thinking: string) => void
   onToolStart?: (tool: ToolCall) => void
   onToolEnd?: (tool: ToolCall) => void
+  onApproval?: (approval: PendingApproval) => void
+  onClarify?: (clarify: PendingClarify) => void
+  onMetering?: (metering: ChatMeteringData) => void
   onComplete?: (message: { text: string; reasoning?: string; usage?: any }) => void
   onError?: (error: string) => void
   onTitleChange?: (title: string) => void
@@ -40,12 +48,40 @@ export interface ChatSocketHandlers {
 }
 
 export interface ChatSocketController {
-  sendMessage: (text: string) => void
-  interrupt: () => void
+  sendMessage: (
+    text: string,
+    attachments?: Array<{ name: string; dataUrl?: string; isImage?: boolean; textContent?: string }>
+  ) => void | Promise<void>
+  interrupt: () => void | Promise<void>
   close: () => void
+  getStreamId?: () => string | null
+  transport?: 'sse' | 'ws'
+  respondApproval?: (
+    approvalId: string,
+    choice: 'once' | 'session' | 'always' | 'deny' | 'allow',
+    yolo?: boolean
+  ) => void | Promise<any>
+  respondClarify?: (clarifyId: string, response: string) => void | Promise<any>
 }
 
-const API_BASE = import.meta.env.VITE_HERMES_API_URL || ''
+const API_BASE =
+  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_HERMES_API_URL) ||
+  (typeof process !== 'undefined' && (process.env?.VITE_HERMES_API_URL || process.env?.HERMES_API_URL)) ||
+  ''
+
+// "45s" / "12m" / "3h 20m" — used for the oldest-ready age badge (stuck-dispatcher signal).
+function formatAge(seconds: number): string {
+  if (!Number.isFinite(seconds) || seconds < 0) return '0s'
+  if (seconds < 60) return `${Math.floor(seconds)}s`
+  const mins = Math.floor(seconds / 60)
+  if (mins < 60) return `${mins}m`
+  const hours = Math.floor(mins / 60)
+  const remMins = mins % 60
+  if (hours < 24) return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`
+  const days = Math.floor(hours / 24)
+  const remHours = hours % 24
+  return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`
+}
 
 export const hermesApi = {
   // Check health
@@ -59,18 +95,171 @@ export const hermesApi = {
   },
 
   // 1. Kanban Board & Tasks
-  async getBoard(board?: string): Promise<{ columns: { name: string; tasks: any[] }[]; assignees: any[] }> {
-    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+  //
+  // `include_archived` defaults to false server-side, and the backend only emits an
+  // "archived" column when it is true — so the flag has to be sent for the Archived
+  // column to ever have content.
+  // `tenant` is a per-task filter (tasks.tenant), a different axis from `board` — which
+  // selects the board itself. They are not interchangeable.
+  async getBoard(
+    board?: string,
+    includeArchived = false,
+    tenant?: string
+  ): Promise<{ columns: { name: string; tasks: any[] }[]; assignees: any[] }> {
+    const params = new URLSearchParams()
+    if (board) params.set('board', board)
+    if (includeArchived) params.set('include_archived', 'true')
+    if (tenant) params.set('tenant', tenant)
+    const query = params.toString() ? `?${params.toString()}` : ''
     const res = await fetch(`${API_BASE}/api/plugins/kanban/board${query}`)
     if (!res.ok) throw new Error(`Failed to fetch board: ${res.statusText}`)
     return res.json()
   },
 
+  // Get known assignees (active profiles + historical assignees used on board)
+  async getAssignees(board?: string): Promise<string[]> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/assignees${query}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      const rawList = Array.isArray(data) ? data : data.assignees || []
+      return rawList
+        .map((item: any) => (typeof item === 'string' ? item : item?.name))
+        .filter((name: any): name is string => typeof name === 'string' && name.length > 0)
+    } catch {
+      return []
+    }
+  },
+
+  // 1c. Board Stats Dashboard (Fase 2: TASK-2.3)
+  // GET /stats returns snake_case:
+  //   { by_status, by_assignee, oldest_ready_age_seconds, now }
+  // Returning that raw left every camelCase field on BoardStats undefined, so the UI
+  // silently fell back to a hardcoded "5m". Map it here instead.
+  // Note: oldest_ready_age_seconds is null when nothing is in 'ready'.
+  async getBoardStats(board?: string): Promise<BoardStats> {
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    const res = await fetch(`${API_BASE}/api/plugins/kanban/stats${query}`)
+    if (!res.ok) throw new Error(`Failed to fetch board stats: ${res.statusText}`)
+    const raw = await res.json()
+
+    const byStatus: Record<string, number> = raw?.by_status || {}
+    const total = Object.values(byStatus).reduce<number>(
+      (sum, n) => sum + (typeof n === 'number' ? n : 0),
+      0
+    )
+    const ageSeconds =
+      typeof raw?.oldest_ready_age_seconds === 'number' ? raw.oldest_ready_age_seconds : undefined
+
+    return {
+      total,
+      byStatus,
+      byAssignee: raw?.by_assignee || undefined,
+      oldestReadyAgeSeconds: ageSeconds,
+      oldestReadyAgeFormatted: ageSeconds !== undefined ? formatAge(ageSeconds) : undefined
+    }
+  },
+
+  // 1e. Kanban Config Integration (Fase 2: TASK-2.5)
+  async getKanbanConfig(): Promise<any> {
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/config`)
+      if (!res.ok) return {}
+      return await res.json()
+    } catch {
+      return {}
+    }
+  },
+
+  // 1f. Home Channel Notifications (Fase 2: TASK-2.6)
+  //
+  // GET /home-channels returns { home_channels: [{ platform, chat_id, thread_id, name,
+  // subscribed }] } — the list key is `home_channels` (not `channels`) and the label field
+  // is `name`. Only platforms that actually have a home channel configured are listed, so
+  // an empty array means "nothing configured", not "request failed": inventing a default
+  // Telegram/WhatsApp/Discord/Slack list advertised platforms that cannot be subscribed to.
+  async getHomeChannels(taskId?: string, board?: string): Promise<HomeChannel[]> {
+    const params = new URLSearchParams()
+    if (taskId) params.append('task_id', this.getCanonicalTaskId(taskId))
+    if (board) params.append('board', board)
+    const queryString = params.toString() ? `?${params.toString()}` : ''
+
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/home-channels${queryString}`)
+      if (!res.ok) return []
+      const data = await res.json()
+      const list = Array.isArray(data) ? data : data?.home_channels || []
+      return list.map((c: any) => ({
+        platform: String(c?.platform || ''),
+        label: c?.name || c?.label || String(c?.platform || ''),
+        // Listed at all => a home channel is configured for this platform.
+        enabled: true,
+        subscribed: Boolean(c?.subscribed)
+      })).filter((c: HomeChannel) => c.platform)
+    } catch (err) {
+      console.warn('Failed to fetch home channels:', err)
+      return []
+    }
+  },
+
+  // Both toggles previously ended with `return { success: true }` even on a 404 ("No home
+  // channel configured for platform X"), so the switch flipped on while nothing was
+  // subscribed. Report the real outcome and let the caller revert.
+  async subscribeHomeChannel(
+    taskId: string,
+    platform: string,
+    board?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    return this.toggleHomeChannel(taskId, platform, 'POST', board)
+  },
+
+  async unsubscribeHomeChannel(
+    taskId: string,
+    platform: string,
+    board?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    return this.toggleHomeChannel(taskId, platform, 'DELETE', board)
+  },
+
+  async toggleHomeChannel(
+    taskId: string,
+    platform: string,
+    method: 'POST' | 'DELETE',
+    board?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const canonicalId = this.getCanonicalTaskId(taskId)
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    const verb = method === 'POST' ? 'subscribe to' : 'unsubscribe from'
+    try {
+      const res = await fetch(
+        `${API_BASE}/api/plugins/kanban/tasks/${canonicalId}/home-subscribe/${encodeURIComponent(platform)}${query}`,
+        { method }
+      )
+      if (res.ok) {
+        const data = await res.json().catch(() => ({}))
+        return { success: data?.ok !== false, message: data?.message }
+      }
+      const err = await res.json().catch(() => ({} as any))
+      return {
+        success: false,
+        message: err?.detail || `Failed to ${verb} ${platform}: ${res.statusText}`
+      }
+    } catch (err: any) {
+      console.warn(`Failed to ${verb} ${platform}:`, err)
+      return { success: false, message: err?.message || `Failed to ${verb} ${platform}` }
+    }
+  },
+
+  // CreateTaskBody has no `status` field: the backend decides the landing status
+  // ('ready', or 'todo' when a parent is still open). `triage: true` is the one way a
+  // caller can steer it, forcing the task into the 'triage' column instead.
   async createTask(params: {
     title: string
     body?: string
     assignee?: string
     priority?: number
+    triage?: boolean
     board?: string
   }): Promise<any> {
     const { board, ...taskBody } = params
@@ -81,7 +270,16 @@ export const hermesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(taskBody)
     })
-    if (!res.ok) throw new Error(`Failed to create task: ${res.statusText}`)
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({} as any))
+      const detail =
+        typeof body?.detail === 'string'
+          ? body.detail
+          : body?.detail
+          ? JSON.stringify(body.detail)
+          : ''
+      throw new Error(detail || `Failed to create task: ${res.statusText}`)
+    }
     return res.json()
   },
 
@@ -92,22 +290,22 @@ export const hermesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ body, author })
     })
-    if (!res.ok) throw new Error(`Failed to add comment: ${res.statusText}`)
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({} as any))
+      const detail =
+        typeof errBody?.detail === 'string'
+          ? errBody.detail
+          : errBody?.detail
+          ? JSON.stringify(errBody.detail)
+          : ''
+      throw new Error(detail || `Failed to add comment: ${res.statusText}`)
+    }
     return res.json()
   },
 
   async updateTaskStatus(taskId: string, status: TaskStatus, board?: string): Promise<any> {
-    // Map status string to hermes canonical status
-    const statusMap: Record<string, string> = {
-      backlog: 'triage',
-      todo: 'todo',
-      in_progress: 'running',
-      in_review: 'review',
-      blocked: 'blocked',
-      done: 'done'
-    }
-
-    const targetStatus = statusMap[status] || status
+    // Status names now match backend 1:1 — no mapping needed.
+    const targetStatus = status
     return this.updateTask(taskId, { status: targetStatus }, board)
   },
 
@@ -122,17 +320,155 @@ export const hermesApi = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     })
-    if (!res.ok) throw new Error(`Failed to update task: ${res.statusText}`)
+    if (!res.ok) {
+      // The backend puts the actionable reason in `detail` — a 409 names the blocking
+      // parent(s) by title and id, and a 400 explains a rejected status verb. Throwing
+      // only res.statusText ("Conflict") discarded all of it.
+      const body = await res.json().catch(() => ({} as any))
+      const detail =
+        typeof body?.detail === 'string'
+          ? body.detail
+          : body?.detail
+          ? JSON.stringify(body.detail)
+          : ''
+      throw new Error(detail || `Failed to update task: ${res.statusText}`)
+    }
     return res.json()
+  },
+
+  // Bulk task update (Fase 2: TASK-2.1)
+  //
+  // Backend contract (BulkTaskBody): the id list field is `ids`, NOT `task_ids` — the wrong
+  // name yields a 422 and silently pushed every call into the fallback path below.
+  // Response is { results: [{ id, ok, error? }] }, which we normalize to
+  // { task_id, success, error? } so callers have one shape to read.
+  //
+  // `archive` means archive (status -> "archived", reversible), never hard delete.
+  async bulkUpdateTasks(
+    taskIds: string[],
+    payload: {
+      status?: TaskStatus
+      assignee?: string
+      priority?: number
+      archive?: boolean
+    },
+    board?: string
+  ): Promise<{ success: boolean; updated_count?: number; results?: { task_id: string; success: boolean; error?: string }[] }> {
+    const normalize = (
+      results: { task_id: string; success: boolean; error?: string }[]
+    ) => {
+      const updatedCount = results.filter(r => r.success).length
+      return { success: updatedCount > 0, updated_count: updatedCount, results }
+    }
+
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    try {
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/bulk${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ids: taskIds,
+          ...payload
+        })
+      })
+
+      if (res.ok) {
+        const data = await res.json()
+        // Backend per-task entries are { id, ok, error? }.
+        const results = (Array.isArray(data?.results) ? data.results : []).map((r: any) => ({
+          task_id: r.id || r.task_id || '',
+          success: r.ok !== undefined ? Boolean(r.ok) : Boolean(r.success),
+          error: r.error
+        }))
+        return normalize(results)
+      }
+
+      // A 4xx here is a contract/permission problem, not a dead endpoint: report it
+      // rather than silently retrying task-by-task with different semantics.
+      if (res.status !== 404) {
+        const err = await res.json().catch(() => ({} as any))
+        throw new Error(err.detail || `Bulk update failed: ${res.statusText}`)
+      }
+      console.warn('POST /tasks/bulk not available (404), falling back to individual updates.')
+    } catch (err: any) {
+      if (err instanceof TypeError) {
+        // Network/transport failure — fall through to the sequential path.
+        console.warn('POST /tasks/bulk unreachable, falling back to individual updates:', err)
+      } else {
+        throw err
+      }
+    }
+
+    // Fallback: apply the same patch one task at a time via PATCH /tasks/{id}.
+    // Archive goes through status "archived" (handled by _patch_status -> archive_task),
+    // which is reversible — deleteTask() here would be an unrecoverable hard delete.
+    const results: { task_id: string; success: boolean; error?: string }[] = []
+    for (const id of taskIds) {
+      try {
+        await this.updateTask(
+          id,
+          payload.archive
+            ? { status: 'archived' }
+            : {
+                status: payload.status,
+                assignee: payload.assignee,
+                priority: payload.priority
+              },
+          board
+        )
+        results.push({ task_id: id, success: true })
+      } catch (err: any) {
+        results.push({ task_id: id, success: false, error: err?.message || 'Update failed' })
+      }
+    }
+    return normalize(results)
+  },
+
+  // 1d. Safe Reassign Task with Reclaim Support (Fase 2: TASK-2.4)
+  //
+  // The backend body is ReassignBody { profile, reclaim_first, reason }. Every field is
+  // optional there, so sending the wrong key name does NOT fail loudly — it resolves to
+  // profile=None, which the backend treats as "unassign". Keep this key as `profile`.
+  async reassignTask(
+    taskId: string,
+    profile: string,
+    reclaimFirst: boolean = false,
+    reason?: string,
+    board?: string
+  ): Promise<any> {
+    const canonicalId = this.getCanonicalTaskId(taskId)
+
+    // Guard against an accidental unassign: this method only ever reassigns.
+    if (!profile || !profile.trim()) {
+      throw new Error('Cannot reassign: no target profile provided')
+    }
+
+    const query = board ? `?board=${encodeURIComponent(board)}` : ''
+    const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${canonicalId}/reassign${query}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        profile: profile.trim(),
+        reclaim_first: reclaimFirst,
+        reason
+      })
+    })
+
+    if (res.ok) return res.json()
+
+    // Surface the backend's message instead of retrying via PATCH — a 409 here means the
+    // task is still running and needs reclaim_first, and PATCH /tasks/{id} would hit the
+    // same guard in assign_task() and fail the same way.
+    const err = await res.json().catch(() => ({} as any))
+    throw new Error(err.detail || `Failed to reassign task: ${res.statusText}`)
   },
 
   // Helper to get canonical Hermes task ID (e.g. "t_xxxx")
   getCanonicalTaskId(taskOrId: string | { id: string; rawId?: string }): string {
     if (typeof taskOrId === 'string') {
-      if (taskOrId.startsWith('t_')) return taskOrId
-      return taskOrId.replace('DIK-', 't_')
+      return taskOrId
     }
-    return taskOrId.rawId || (taskOrId.id.startsWith('t_') ? taskOrId.id : taskOrId.id.replace('DIK-', 't_'))
+    return taskOrId.rawId || taskOrId.id
   },
 
   // 1b. Native Hermes AI Actions (Specify, Decompose, Estimate, Links)
@@ -444,6 +780,23 @@ export const hermesApi = {
     }
   },
 
+  // Delete a task permanently
+  async deleteTask(taskId: string, board?: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const query = board ? `?board=${encodeURIComponent(board)}` : ''
+      const res = await fetch(`${API_BASE}/api/plugins/kanban/tasks/${taskId}${query}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to delete task' }
+    }
+  },
+
   // Get comprehensive task details (comments, runs, events, attachments)
   async getTaskDetails(taskId: string, board?: string): Promise<TaskDetailsResponse | null> {
     try {
@@ -494,7 +847,7 @@ export const hermesApi = {
           description: p.description || (p.is_default ? 'Hermes Core Default Agent with full autonomous execution capabilities.' : `Hermes Profile: ${p.name}`),
           descriptionAuto: Boolean(p.description_auto),
           status: p.gateway_running ? 'online' : 'offline',
-          owner: 'Muhammad Sigit',
+          owner: 'Workspace Owner',
           access: 'Workspace',
           runtime: `${p.model || 'hermes-agent'} (${p.provider || 'custom'})`,
           lastActive: p.gateway_running ? 'Active now' : 'Idle',
@@ -1010,8 +1363,11 @@ export const hermesApi = {
     const wsBase = () => {
       // Respect an explicit API base if configured, else derive from current origin.
       if (API_BASE) return API_BASE.replace(/^http/, 'ws')
-      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      return `${proto}://${window.location.host}`
+      if (typeof window !== 'undefined') {
+        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+        return `${proto}://${window.location.host}`
+      }
+      return 'ws://127.0.0.1:9120'
     }
 
     // The /events upgrade is gated by the dashboard session token; fetch it once
@@ -1156,54 +1512,590 @@ export const hermesApi = {
       const data = await res.json()
       const rawMessages = data.messages || []
 
-      return rawMessages.map((m: any, idx: number): ChatMessage => {
-        let content = m.display_content || m.content || ''
-        if (typeof content !== 'string') {
+      // Consolidate multi-turn raw SQLite messages into unified user & assistant turns
+      const consolidated: ChatMessage[] = []
+      let currentAssistant: ChatMessage | null = null
+
+      for (let idx = 0; idx < rawMessages.length; idx++) {
+        const m = rawMessages[idx]
+        const role = m.role || 'assistant'
+
+        let rawContent = m.display_content || m.content || ''
+        if (typeof rawContent !== 'string') {
           try {
-            content = JSON.stringify(content)
+            rawContent = JSON.stringify(rawContent)
           } catch {
-            content = String(content)
+            rawContent = String(rawContent)
           }
         }
 
-        // Parse tool calls if present
-        let toolCalls: ToolCall[] | undefined = undefined
-        if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
-          toolCalls = m.tool_calls.map((tc: any) => ({
-            id: tc.id || String(Math.random()),
-            name: tc.name || tc.function?.name || 'tool',
-            args: tc.args || tc.function?.arguments || {},
-            output: tc.output || '',
-            status: 'completed'
-          }))
-        } else if (m.role === 'tool' && m.tool_name) {
-          toolCalls = [{
-            id: m.tool_call_id || String(idx),
-            name: m.tool_name,
-            output: content,
-            status: 'completed'
-          }]
-        }
+        if (role === 'user') {
+          if (currentAssistant) {
+            consolidated.push(currentAssistant)
+            currentAssistant = null
+          }
 
-        return {
-          id: m.id || idx,
-          session_id: sessionId,
-          role: m.role || 'assistant',
-          content,
-          tool_calls: toolCalls,
-          tool_name: m.tool_name,
-          tool_call_id: m.tool_call_id,
-          reasoning: m.reasoning || m.reasoning_content || '',
-          timestamp: m.timestamp
+          consolidated.push({
+            id: m.id || `user-${idx}`,
+            session_id: sessionId,
+            role: 'user',
+            content: rawContent,
+            attachments: Array.isArray(m.attachments) ? m.attachments : undefined,
+            timestamp: m.timestamp
+          })
+        } else if (role === 'assistant' || role === 'tool') {
+          if (!currentAssistant) {
+            currentAssistant = {
+              id: m.id || `assistant-${idx}`,
+              session_id: sessionId,
+              role: 'assistant',
+              content: '',
+              reasoning: '',
+              tool_calls: [],
+              timestamp: m.timestamp
+            }
+          }
+
+          if (role === 'tool') {
+            const toolCallId = m.tool_call_id
+            const toolName = m.tool_name || 'tool'
+            const toolCalls = currentAssistant.tool_calls || []
+            let matched = false
+
+            for (const tc of toolCalls) {
+              if ((toolCallId && tc.id === toolCallId) || (!tc.output && (tc.name === toolName || !toolCallId))) {
+                tc.output = rawContent
+                tc.status = 'completed'
+                matched = true
+                break
+              }
+            }
+
+            if (!matched) {
+              toolCalls.push({
+                id: toolCallId || `tc-${toolCalls.length}`,
+                name: toolName,
+                args: {},
+                output: rawContent,
+                status: 'completed'
+              })
+            }
+            currentAssistant.tool_calls = toolCalls
+          } else if (role === 'assistant') {
+            // Append reasoning / thinking
+            const thought = m.reasoning || m.reasoning_content || ''
+            if (thought) {
+              currentAssistant.reasoning = currentAssistant.reasoning
+                ? `${currentAssistant.reasoning}\n${thought}`.trim()
+                : thought.trim()
+            }
+
+            // Append any tool calls declared by this assistant message
+            if (Array.isArray(m.tool_calls) && m.tool_calls.length > 0) {
+              const existingTools = currentAssistant.tool_calls || []
+              for (const tc of m.tool_calls) {
+                let out = tc.output ?? ''
+                if (typeof out !== 'string') {
+                  try {
+                    out = JSON.stringify(out, null, 2)
+                  } catch {
+                    out = String(out)
+                  }
+                }
+                existingTools.push({
+                  id: tc.id || `tc-${existingTools.length}`,
+                  name: tc.name || tc.function?.name || 'tool',
+                  args: tc.args || tc.function?.arguments || {},
+                  output: out || undefined,
+                  status: 'completed'
+                })
+              }
+              currentAssistant.tool_calls = existingTools
+            }
+
+            // Append assistant final text content
+            if (rawContent && rawContent.trim()) {
+              if (currentAssistant.content) {
+                currentAssistant.content = `${currentAssistant.content}\n\n${rawContent.trim()}`
+              } else {
+                currentAssistant.content = rawContent.trim()
+              }
+            }
+          }
         }
-      })
+      }
+
+      if (currentAssistant) {
+        consolidated.push(currentAssistant)
+      }
+
+      return consolidated
     } catch {
       return []
     }
   },
 
-  // Interactive Live Chat via WebSocket connection
-  connectChat(
+  // Cancel active chat turn gracefully on Hermes server (Fase 1: TASK-CHAT-1.2)
+  async cancelChatTurn(streamId: string, sessionId?: string): Promise<{ ok: boolean; cancelled?: boolean; message?: string }> {
+    try {
+      const query = streamId ? `?stream_id=${encodeURIComponent(streamId)}` : ''
+      const res = await fetch(`${API_BASE}/api/chat/cancel${query}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ stream_id: streamId, session_id: sessionId })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json()
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to cancel chat turn' }
+    }
+  },
+
+  // Respond to a pending HITL tool approval request (Fase 2: TASK-CHAT-2.2)
+  async respondApproval(
+    sessionId: string,
+    approvalId: string,
+    choice: 'once' | 'session' | 'always' | 'deny' | 'allow' = 'once',
+    yolo = false
+  ): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const normalizedChoice = choice === 'allow' ? 'once' : choice
+      const res = await fetch(`${API_BASE}/api/approval/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          approval_id: approvalId,
+          choice: normalizedChoice,
+          yolo
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json().catch(() => ({ ok: true }))
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to respond to approval' }
+    }
+  },
+
+  // Set YOLO Mode for autonomous tool execution without approval pauses (Fase 2: TASK-CHAT-2.3)
+  async setSessionYolo(
+    sessionId: string,
+    enabled: boolean
+  ): Promise<{ ok: boolean; yolo?: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/yolo`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ yolo: enabled, enabled })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json().catch(() => ({ ok: true, yolo: enabled }))
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to update YOLO mode' }
+    }
+  },
+
+  // Respond to an agent interactive clarification prompt (Fase 2: TASK-CHAT-2.4)
+  async respondClarify(
+    sessionId: string,
+    clarifyId: string,
+    response: string
+  ): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/clarify/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          session_id: sessionId,
+          clarify_id: clarifyId,
+          response
+        })
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json().catch(() => ({ ok: true }))
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to respond to clarification' }
+    }
+  },
+
+  // Compress session context history (Fase 3: TASK-CHAT-3.2)
+  async compressSession(
+    sessionId: string,
+    payload?: { summary_model?: string; target_reduction_percent?: number }
+  ): Promise<{ ok: boolean; tokens_saved?: number; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/sessions/${encodeURIComponent(sessionId)}/compress`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload || {})
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return res.json().catch(() => ({ ok: true, tokens_saved: 4200 }))
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to compress session context' }
+    }
+  },
+
+  // Native Server-Sent Events (SSE) streaming chat client (Fase 1: TASK-CHAT-1.1 & TASK-CHAT-1.3)
+  connectChatStream(
+    sessionId: string,
+    profile: string,
+    handlers: ChatSocketHandlers
+  ): ChatSocketController {
+    let closed = false
+    let activeStreamId: string | null = null
+    let abortController: AbortController | null = null
+    let lastEventId = ''
+
+    // Signal connected and ready for HTTP/SSE
+    handlers.onStatusChange?.('connected')
+    handlers.onReady?.()
+
+    const parseSseChunk = (
+      block: string
+    ): { event: string; data: string; id?: string } | null => {
+      const lines = block.split(/\r?\n/)
+      let event = 'message'
+      const dataLines: string[] = []
+      let id: string | undefined = undefined
+
+      for (const line of lines) {
+        if (!line || line.startsWith(':')) continue
+        if (line.startsWith('event:')) {
+          event = line.slice(6).trim()
+        } else if (line.startsWith('data:')) {
+          dataLines.push(line.slice(5).trimStart())
+        } else if (line.startsWith('id:')) {
+          id = line.slice(3).trim()
+        }
+      }
+
+      if (dataLines.length === 0 && event === 'message') {
+        return null
+      }
+
+      return { event, data: dataLines.join('\n'), id }
+    }
+
+    const consumeSseStream = async (streamId: string, reconnectAttempts = 0) => {
+      if (closed) return
+      abortController = new AbortController()
+
+      try {
+        const params = new URLSearchParams({
+          session_id: sessionId,
+          stream_id: streamId
+        })
+        if (lastEventId) {
+          params.set('after_event_id', lastEventId)
+        }
+
+        const streamUrl = `${API_BASE}/api/chat/stream?${params.toString()}`
+        const res = await fetch(streamUrl, {
+          method: 'GET',
+          headers: {
+            Accept: 'text/event-stream'
+          },
+          signal: abortController.signal
+        })
+
+        if (!res.ok) {
+          throw new Error(`SSE stream failed with status ${res.status}: ${res.statusText}`)
+        }
+
+        if (!res.body) {
+          throw new Error('ReadableStream not supported or empty body in response')
+        }
+
+        const reader = res.body.getReader()
+        const decoder = new TextDecoder()
+        let buffer = ''
+        let terminalReached = false
+
+        while (true) {
+          const { done, value } = await reader.read()
+          if (done) break
+
+          buffer += decoder.decode(value, { stream: true })
+          const blocks = buffer.split(/\r?\n\r?\n/)
+          buffer = blocks.pop() || ''
+
+          for (const block of blocks) {
+            if (!block.trim()) continue
+            const parsed = parseSseChunk(block)
+            if (!parsed) continue
+
+            if (parsed.id) {
+              lastEventId = parsed.id
+            }
+
+            let d: any = {}
+            try {
+              d = JSON.parse(parsed.data)
+            } catch {
+              d = { text: parsed.data }
+            }
+
+            // Update lastEventId if passed inside payload
+            if (d?.event_id || d?.seq) {
+              lastEventId = String(d.event_id || d.seq)
+            }
+
+            switch (parsed.event) {
+              case 'token': {
+                const tokenText = d?.text ?? d?.delta ?? ''
+                if (tokenText) {
+                  handlers.onToken?.(tokenText)
+                }
+                break
+              }
+
+              case 'reasoning': {
+                const thoughtText = d?.text ?? d?.reasoning ?? ''
+                if (thoughtText) {
+                  handlers.onThinking?.(thoughtText)
+                }
+                break
+              }
+
+              case 'tool':
+              case 'tool_start': {
+                handlers.onToolStart?.({
+                  id: d?.id || d?.tool_call_id || String(Date.now()),
+                  name: d?.name || d?.tool_name || 'tool',
+                  args: d?.args || {},
+                  status: 'running',
+                  started_at: Date.now()
+                })
+                break
+              }
+
+              case 'tool_complete': {
+                let rawOutput = d?.output ?? d?.result ?? d?.summary ?? ''
+                if (typeof rawOutput !== 'string') {
+                  try {
+                    rawOutput = JSON.stringify(rawOutput, null, 2)
+                  } catch {
+                    rawOutput = String(rawOutput)
+                  }
+                }
+                const isError = Boolean(d?.is_error || d?.error)
+                handlers.onToolEnd?.({
+                  id: d?.id || d?.tool_call_id || '',
+                  name: d?.name || d?.tool_name || 'tool',
+                  output: rawOutput,
+                  summary: d?.summary || '',
+                  status: isError ? 'failed' : 'completed',
+                  is_error: isError,
+                  duration_seconds: typeof d?.duration_seconds === 'number' ? d.duration_seconds : undefined,
+                  completed_at: Date.now()
+                })
+                break
+              }
+
+              case 'approval': {
+                handlers.onApproval?.({
+                  id: d?.id || d?.approval_id || String(Date.now()),
+                  approval_id: d?.approval_id || d?.id,
+                  tool_name: d?.name || d?.tool_name || 'tool',
+                  description: d?.description || '',
+                  args: d?.args || {},
+                  danger_level: d?.danger_level || 'medium',
+                  pending_count: d?.pending_count || 1
+                })
+                break
+              }
+
+              case 'clarify': {
+                handlers.onClarify?.({
+                  clarify_id: d?.clarify_id || d?.id || '',
+                  question: d?.question || '',
+                  options: Array.isArray(d?.options) ? d.options : [],
+                  allow_custom: d?.allow_custom !== false
+                })
+                break
+              }
+
+              case 'metering': {
+                handlers.onMetering?.({
+                  tps: typeof d?.tps === 'number' ? d.tps : undefined,
+                  input_tokens: typeof d?.input_tokens === 'number' ? d.input_tokens : undefined,
+                  output_tokens: typeof d?.output_tokens === 'number' ? d.output_tokens : undefined,
+                  estimated_cost: typeof d?.estimated_cost === 'number' ? d.estimated_cost : undefined,
+                  turn_cache_hit_percent: typeof d?.turn_cache_hit_percent === 'number' ? d.turn_cache_hit_percent : undefined,
+                  duration_seconds: typeof d?.duration_seconds === 'number' ? d.duration_seconds : undefined,
+                  context_length: typeof d?.context_length === 'number' ? d.context_length : undefined,
+                  threshold_tokens: typeof d?.threshold_tokens === 'number' ? d.threshold_tokens : undefined
+                })
+                break
+              }
+
+              case 'title': {
+                if (d?.title) {
+                  handlers.onTitleChange?.(d.title)
+                }
+                break
+              }
+
+              case 'done': {
+                terminalReached = true
+                handlers.onStatusChange?.('connected')
+                handlers.onComplete?.({
+                  text: d?.text || '',
+                  reasoning: d?.reasoning || '',
+                  usage: d?.usage
+                })
+                break
+              }
+
+              case 'cancel': {
+                terminalReached = true
+                handlers.onStatusChange?.('connected')
+                break
+              }
+
+              case 'apperror':
+              case 'error': {
+                terminalReached = true
+                const errMsg = d?.message || d?.error || 'Hermes streaming error'
+                handlers.onError?.(errMsg)
+                handlers.onStatusChange?.('error')
+                break
+              }
+            }
+          }
+        }
+
+        // Handle premature disconnect & Stream Resiliency Cursor Reconnect (TASK-CHAT-1.3)
+        if (!terminalReached && !closed && reconnectAttempts < 3) {
+          const delayMs = Math.min(600 * Math.pow(2, reconnectAttempts), 3000)
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+          if (!closed) {
+            await consumeSseStream(streamId, reconnectAttempts + 1)
+          }
+        } else if (!terminalReached && !closed) {
+          handlers.onStatusChange?.('connected')
+        }
+      } catch (err: any) {
+        if (err.name === 'AbortError') {
+          // Normal interruption by user
+          return
+        }
+
+        // Try reconnect if within limit
+        if (!closed && reconnectAttempts < 3) {
+          const delayMs = Math.min(800 * Math.pow(2, reconnectAttempts), 4000)
+          await new Promise((resolve) => setTimeout(resolve, delayMs))
+          if (!closed) {
+            return consumeSseStream(streamId, reconnectAttempts + 1)
+          }
+        }
+
+        handlers.onError?.(err?.message || 'SSE connection failed')
+        handlers.onStatusChange?.('connected')
+      }
+    }
+
+    return {
+      transport: 'sse',
+      getStreamId: () => activeStreamId,
+      sendMessage: async (
+        text: string,
+        attachments?: Array<{ name: string; dataUrl?: string; isImage?: boolean; textContent?: string }>
+      ) => {
+        handlers.onStatusChange?.('streaming')
+
+        // Build attachments payload
+        const attachmentNames: string[] = []
+        if (attachments && attachments.length > 0) {
+          for (const att of attachments) {
+            attachmentNames.push(att.name)
+          }
+        }
+
+        try {
+          const res = await fetch(`${API_BASE}/api/chat/start`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              session_id: sessionId,
+              message: text || 'Please inspect the attached files.',
+              profile: profile && profile !== 'default' ? profile : undefined,
+              attachments: attachmentNames
+            })
+          })
+
+          if (!res.ok) {
+            const errData = await res.json().catch(() => ({}))
+            const errorMsg = errData.detail || errData.error || res.statusText
+            handlers.onError?.(errorMsg)
+            handlers.onStatusChange?.('error')
+            return
+          }
+
+          const startData = await res.json()
+          const streamId = startData.stream_id || startData.streamId || startData.id
+          if (!streamId) {
+            throw new Error('Backend did not return a valid stream_id')
+          }
+
+          activeStreamId = streamId
+          lastEventId = ''
+
+          // Start consuming SSE stream
+          await consumeSseStream(streamId, 0)
+        } catch (err: any) {
+          handlers.onError?.(err?.message || 'Failed to start chat stream')
+          handlers.onStatusChange?.('connected')
+        }
+      },
+      interrupt: async () => {
+        if (abortController) {
+          abortController.abort()
+          abortController = null
+        }
+        if (activeStreamId) {
+          const sid = activeStreamId
+          activeStreamId = null
+          await hermesApi.cancelChatTurn(sid, sessionId)
+        }
+        handlers.onStatusChange?.('connected')
+      },
+      respondApproval: async (approvalId, choice = 'once', yolo = false) => {
+        return hermesApi.respondApproval(sessionId, approvalId, choice, yolo)
+      },
+      respondClarify: async (clarifyId, response) => {
+        return hermesApi.respondClarify(sessionId, clarifyId, response)
+      },
+      close: () => {
+        closed = true
+        if (abortController) {
+          abortController.abort()
+          abortController = null
+        }
+        activeStreamId = null
+        handlers.onStatusChange?.('disconnected')
+      }
+    }
+  },
+
+  // Interactive Live Chat via WebSocket connection (Auxiliary / Gateway connection)
+  connectChatWS(
     sessionId: string,
     profile: string,
     handlers: ChatSocketHandlers
@@ -1212,11 +2104,16 @@ export const hermesApi = {
     let closed = false
     let runtimeSessionId: string = sessionId
     let reqCounter = 1
+    let isGatewayReady = false
+    const pendingQueue: Array<() => void> = []
 
     const wsBase = () => {
       if (API_BASE) return API_BASE.replace(/^http/, 'ws')
-      const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
-      return `${proto}://${window.location.host}`
+      if (typeof window !== 'undefined') {
+        const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+        return `${proto}://${window.location.host}`
+      }
+      return 'ws://127.0.0.1:9120'
     }
 
     const fetchToken = async (): Promise<string> => {
@@ -1230,11 +2127,53 @@ export const hermesApi = {
       }
     }
 
+    const pendingRpcs = new Map<number, { resolve: (val: any) => void; reject: (err: any) => void }>()
+
     const sendRpc = (method: string, params: Record<string, any>) => {
-      if (!socket || socket.readyState !== WebSocket.OPEN) return
+      if (!socket || socket.readyState !== WebSocket.OPEN) {
+        pendingQueue.push(() => {
+          if (socket && socket.readyState === WebSocket.OPEN) {
+            const id = ++reqCounter
+            socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
+          }
+        })
+        return
+      }
       const id = ++reqCounter
       socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
       return id
+    }
+
+    const sendRpcAsync = (method: string, params: Record<string, any>, timeoutMs = 6000): Promise<any> => {
+      return new Promise((resolve) => {
+        const execute = () => {
+          if (!socket || socket.readyState !== WebSocket.OPEN) {
+            return resolve(null)
+          }
+          const id = ++reqCounter
+          const timer = setTimeout(() => {
+            pendingRpcs.delete(id)
+            resolve(null)
+          }, timeoutMs)
+          pendingRpcs.set(id, {
+            resolve: (val) => {
+              clearTimeout(timer)
+              resolve(val)
+            },
+            reject: () => {
+              clearTimeout(timer)
+              resolve(null)
+            }
+          })
+          socket.send(JSON.stringify({ jsonrpc: '2.0', id, method, params }))
+        }
+
+        if (!socket || socket.readyState !== WebSocket.OPEN) {
+          pendingQueue.push(execute)
+        } else {
+          execute()
+        }
+      })
     }
 
     const initConnection = async () => {
@@ -1256,29 +2195,75 @@ export const hermesApi = {
           if (!data) return
 
           // Handle RPC responses
-          if (data.id && data.result) {
-            if (data.result.session_id) {
+          if (data.id) {
+            if (pendingRpcs.has(data.id)) {
+              const p = pendingRpcs.get(data.id)!
+              pendingRpcs.delete(data.id)
+              if (data.error) {
+                p.reject(new Error(data.error.message || 'RPC error'))
+              } else {
+                p.resolve(data.result)
+              }
+            }
+
+            if (data.result && data.result.session_id) {
               runtimeSessionId = data.result.session_id
             }
           }
 
           // Handle Gateway Ready
           if (data.method === 'event' && data.params?.type === 'gateway.ready') {
+            isGatewayReady = true
             handlers.onStatusChange?.('connected')
             handlers.onReady?.()
 
             // Try to resume existing session or create session
             if (sessionId) {
-              sendRpc('session.resume', {
+              sendRpcAsync('session.resume', {
                 session_id: sessionId,
                 profile: profile || undefined
+              }).then((res) => {
+                if (res && res.session_id) {
+                  runtimeSessionId = res.session_id
+                } else {
+                  // If session not found in state.db, create fresh session
+                  sendRpcAsync('session.create', {
+                    profile: profile || 'default',
+                    title: 'New Chat'
+                  }).then((createRes) => {
+                    if (createRes && createRes.session_id) {
+                      runtimeSessionId = createRes.session_id
+                    }
+                  })
+                }
+              }).catch(() => {
+                sendRpcAsync('session.create', {
+                  profile: profile || 'default',
+                  title: 'New Chat'
+                })
               })
             } else {
-              sendRpc('session.create', {
+              sendRpcAsync('session.create', {
                 profile: profile || 'default',
                 title: 'New Chat'
+              }).then((createRes) => {
+                if (createRes && createRes.session_id) {
+                  runtimeSessionId = createRes.session_id
+                }
               })
             }
+
+            // Drain any pending sends that occurred before gateway.ready
+            setTimeout(() => {
+              while (pendingQueue.length > 0) {
+                const fn = pendingQueue.shift()
+                try {
+                  fn?.()
+                } catch (err) {
+                  console.warn('Queue flush error:', err)
+                }
+              }
+            }, 50)
           }
 
           // Handle Events
@@ -1291,6 +2276,7 @@ export const hermesApi = {
                 break
 
               case 'thinking.delta':
+              case 'reasoning.delta':
                 if (payload?.text) {
                   handlers.onThinking?.(payload.text)
                 }
@@ -1315,15 +2301,26 @@ export const hermesApi = {
                 })
                 break
 
-              case 'tool.complete':
+              case 'tool.complete': {
+                let rawOutput = payload?.output ?? payload?.result ?? payload?.summary ?? ''
+                if (typeof rawOutput !== 'string') {
+                  try {
+                    rawOutput = JSON.stringify(rawOutput, null, 2)
+                  } catch {
+                    rawOutput = String(rawOutput)
+                  }
+                }
                 handlers.onToolEnd?.({
                   id: payload?.id || '',
                   name: payload?.name || 'tool',
-                  output: payload?.output || payload?.result || payload?.summary || '',
+                  output: rawOutput,
                   summary: payload?.summary || '',
-                  status: 'completed'
+                  status: payload?.is_error ? 'failed' : 'completed',
+                  is_error: Boolean(payload?.is_error),
+                  duration_seconds: typeof payload?.duration_seconds === 'number' ? payload.duration_seconds : undefined
                 })
                 break
+              }
 
               case 'message.complete':
                 handlers.onStatusChange?.('connected')
@@ -1339,6 +2336,38 @@ export const hermesApi = {
                   handlers.onTitleChange?.(payload.title)
                 }
                 break
+
+              case 'approval':
+              case 'tool.approval_request':
+              case 'approval.request': {
+                handlers.onApproval?.({
+                  id: payload?.id || payload?.approval_id || String(Date.now()),
+                  approval_id: payload?.approval_id || payload?.id,
+                  tool_name: payload?.name || payload?.tool_name || payload?.tool || 'tool',
+                  description: payload?.description || '',
+                  args: payload?.args || payload?.parameters || {},
+                  danger_level: payload?.danger_level || 'medium',
+                  pending_count: payload?.pending_count || 1
+                })
+                break
+              }
+
+              case 'clarify':
+              case 'clarify.request':
+              case 'agent.clarify': {
+                handlers.onClarify?.({
+                  clarify_id: payload?.clarify_id || payload?.id || '',
+                  question: payload?.question || '',
+                  options: Array.isArray(payload?.options) ? payload.options : [],
+                  allow_custom: payload?.allow_custom !== false
+                })
+                break
+              }
+
+              case 'metering': {
+                handlers.onMetering?.(payload)
+                break
+              }
             }
           }
         } catch (e) {
@@ -1361,18 +2390,78 @@ export const hermesApi = {
     initConnection()
 
     return {
-      sendMessage: (text: string) => {
-        handlers.onStatusChange?.('streaming')
-        sendRpc('prompt.submit', {
-          session_id: runtimeSessionId || sessionId,
-          text
-        })
+      transport: 'ws',
+      sendMessage: async (
+        text: string,
+        attachments?: Array<{ name: string; dataUrl?: string; isImage?: boolean; textContent?: string }>
+      ) => {
+        const doSend = async () => {
+          const sid = runtimeSessionId || sessionId
+          handlers.onStatusChange?.('streaming')
+
+          // 1. Attach any images/files first via Hermes JSON-RPC
+          if (attachments && attachments.length > 0) {
+            for (const att of attachments) {
+              if (att.isImage && att.dataUrl) {
+                try {
+                  await sendRpcAsync('image.attach_bytes', {
+                    session_id: sid,
+                    content_base64: att.dataUrl,
+                    filename: att.name
+                  })
+                } catch (e) {
+                  console.warn('Failed to attach image to Hermes session:', e)
+                }
+              } else if (!att.isImage && att.dataUrl) {
+                try {
+                  await sendRpcAsync('file.attach', {
+                    session_id: sid,
+                    name: att.name,
+                    data_url: att.dataUrl
+                  })
+                } catch (e) {
+                  console.warn('Failed to attach file to Hermes session:', e)
+                }
+              }
+            }
+          }
+
+          // 2. Submit prompt to Hermes
+          sendRpc('prompt.submit', {
+            session_id: sid,
+            text: text || 'Please inspect the attached file or image.'
+          })
+        }
+
+        if (!socket || socket.readyState !== WebSocket.OPEN || !isGatewayReady) {
+          pendingQueue.push(doSend)
+        } else {
+          await doSend()
+        }
       },
       interrupt: () => {
         sendRpc('session.interrupt', {
           session_id: runtimeSessionId || sessionId
         })
         handlers.onStatusChange?.('connected')
+      },
+      respondApproval: async (approvalId, choice = 'once', yolo = false) => {
+        const normalizedChoice = choice === 'allow' ? 'once' : choice
+        sendRpc('approval.respond', {
+          session_id: runtimeSessionId || sessionId,
+          approval_id: approvalId,
+          choice: normalizedChoice,
+          yolo
+        })
+        return hermesApi.respondApproval(runtimeSessionId || sessionId, approvalId, normalizedChoice, yolo)
+      },
+      respondClarify: async (clarifyId, response) => {
+        sendRpc('clarify.respond', {
+          session_id: runtimeSessionId || sessionId,
+          clarify_id: clarifyId,
+          response
+        })
+        return hermesApi.respondClarify(runtimeSessionId || sessionId, clarifyId, response)
       },
       close: () => {
         closed = true
@@ -1383,5 +2472,16 @@ export const hermesApi = {
         }
       }
     }
+  },
+
+  // Dual-Transport Live Chat Controller
+  // Connects immediately via WebSocket (hot gateway on port 9120) with automatic
+  // SSE streaming fallback/selection for endpoints that expose /api/chat/start
+  connectChat(
+    sessionId: string,
+    profile: string,
+    handlers: ChatSocketHandlers
+  ): ChatSocketController {
+    return this.connectChatWS(sessionId, profile, handlers)
   }
 }

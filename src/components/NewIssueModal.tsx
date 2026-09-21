@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { X, Plus, Play } from 'lucide-react'
 import { Task, TaskStatus, Priority, AIAgent, Project } from '../types'
+import { hermesApi } from '../api/hermesApi'
 
 interface NewIssueModalProps {
   isOpen: boolean
@@ -33,14 +34,33 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
   const [priority, setPriority] = useState<Priority>('medium')
   const [assigneeProfile, setAssigneeProfile] = useState(initialAssignee)
   const [projectSlug, setProjectSlug] = useState(initialBoardSlug)
-  const [runImmediately, setRunImmediately] = useState(true)
+  const [runImmediately, setRunImmediately] = useState(false)
+  const [knownAssignees, setKnownAssignees] = useState<string[]>([])
+
+  // Fetch known assignees from backend when modal opens or board changes
+  useEffect(() => {
+    if (!isOpen) return
+    let active = true
+    hermesApi.getAssignees(projectSlug || initialBoardSlug).then(list => {
+      if (active && list.length > 0) {
+        setKnownAssignees(list)
+      }
+    })
+    return () => {
+      active = false
+    }
+  }, [isOpen, projectSlug, initialBoardSlug])
 
   // Initialize and synchronize defaults whenever modal opens or lists update
   useEffect(() => {
     if (isOpen) {
       if (initialTitle) setTitle(initialTitle)
       if (initialDescription) setDescription(initialDescription)
-      if (initialStatus) setStatus(initialStatus)
+      // Callers pass the column they were clicked from (the "+" on each Kanban column),
+      // but create only supports Triage vs. backend-derived. Honour an explicit Triage
+      // request and collapse everything else to the default rather than pre-selecting a
+      // column the task cannot actually be created in.
+      setStatus(initialStatus === 'triage' ? 'triage' : 'todo')
 
       if (initialAssignee) {
         setAssigneeProfile(initialAssignee)
@@ -78,7 +98,7 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
       {
         title: title.trim(),
         description: description.trim(),
-        status: runImmediately ? 'in_progress' : status,
+        status: runImmediately ? 'running' : status,
         priority,
         assigneeType: 'agent',
         assigneeName: resolvedAgent?.name || resolvedProfile,
@@ -97,25 +117,25 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 dark:border-[#282D37] bg-white dark:bg-[#16191E] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 font-body">
+      <div className="w-full max-w-lg rounded-2xl border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
         {/* Modal Header */}
-        <div className="p-3.5 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between">
+        <div className="p-4 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between">
           <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">DikstraCloud</span>
+            <span className="text-slate-400">Aura</span>
             <span className="text-slate-500">/</span>
-            <h3 className="font-semibold text-slate-800 dark:text-white">New Issue</h3>
+            <h3 className="font-semibold text-slate-900 dark:text-white font-display text-sm">New Issue</h3>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Modal Form */}
-        <form onSubmit={handleSubmit} className="p-4 space-y-3.5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
             <input
               type="text"
@@ -124,7 +144,7 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
               value={title}
               onChange={e => setTitle(e.target.value)}
               placeholder="Issue title (e.g. Asesmen Arsitektur VPC, Buat Diagram...)"
-              className="w-full px-3 py-2 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3.5 py-2 text-sm font-medium rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none focus:border-[#F97316] focus:ring-1 focus:ring-orange-500/30 transition-colors"
             />
           </div>
 
@@ -134,34 +154,45 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
               value={description}
               onChange={e => setDescription(e.target.value)}
               placeholder="Add detailed task instructions or requirements for Hermes Agent..."
-              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full px-3.5 py-2 text-xs rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#F97316] focus:ring-1 focus:ring-orange-500/30 resize-none transition-colors"
             />
           </div>
 
           {/* Properties grid */}
           <div className="grid grid-cols-2 gap-3 text-xs">
             <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Status</label>
+              <label className="block text-[11px] text-slate-500 mb-1 font-mono">Start in</label>
+              {/*
+                Only these two are real choices on create. The backend's CreateTaskBody has
+                no `status` field — it derives the landing status itself ('ready', or 'todo'
+                when a parent is still open) and exposes just a `triage` flag. Offering
+                Scheduled/Ready/Blocked/Review here meant picking a column the task was
+                never placed in, then watching it jump on the next refresh.
+              */}
               <select
-                value={status}
-                onChange={e => setStatus(e.target.value as TaskStatus)}
-                className="w-full p-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200"
+                value={status === 'triage' ? 'triage' : 'auto'}
+                onChange={e =>
+                  setStatus(e.target.value === 'triage' ? 'triage' : 'todo')
+                }
+                aria-label="Starting column for the new task"
+                className="w-full p-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:border-[#F97316]"
               >
-                <option value="backlog">Backlog</option>
-                <option value="todo">Todo</option>
-                <option value="in_progress">In Progress</option>
-                <option value="in_review">In Review</option>
-                <option value="blocked">Blocked</option>
-                <option value="done">Done</option>
+                <option value="auto">Queue for work (Hermes decides)</option>
+                <option value="triage">Triage (refine first)</option>
               </select>
+              <p className="mt-1 text-[10px] text-slate-400 leading-snug">
+                {status === 'triage'
+                  ? 'Parked in Triage until you specify or decompose it.'
+                  : 'Lands in Ready, or Todo while a parent task is still open.'}
+              </p>
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Priority</label>
+              <label className="block text-[11px] text-slate-500 mb-1 font-mono">Priority</label>
               <select
                 value={priority}
                 onChange={e => setPriority(e.target.value as Priority)}
-                className="w-full p-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200"
+                className="w-full p-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:border-[#F97316]"
               >
                 <option value="urgent">Urgent</option>
                 <option value="high">High</option>
@@ -172,26 +203,45 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
             </div>
 
             <div>
-              <label className="block text-[11px] text-slate-500 mb-1">Assign to Agent</label>
+              <label className="block text-[11px] text-slate-500 mb-1 font-mono">Assign to Agent</label>
               <select
                 value={assigneeProfile}
                 onChange={e => setAssigneeProfile(e.target.value)}
-                className="w-full p-1.5 rounded border border-slate-200 dark:border-slate-700 bg-white dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200"
+                className="w-full p-2 rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:border-[#F97316]"
               >
+                {/* Active Agent Profiles */}
                 {agents.length > 0 ? (
-                  agents.map(agent => (
-                    <option key={agent.id} value={agent.id}>
-                      {agent.avatar || '🤖'} {agent.name} ({agent.id}) {agent.status === 'online' ? '• Online' : ''}
-                    </option>
-                  ))
+                  <optgroup label="Active Profiles">
+                    {agents.map(agent => (
+                      <option key={agent.id} value={agent.id}>
+                        {agent.avatar || '🤖'} {agent.name} ({agent.id}) {agent.status === 'online' ? '• Online' : ''}
+                      </option>
+                    ))}
+                  </optgroup>
                 ) : (
-                  <>
+                  <optgroup label="Default Agents">
                     <option value="sa-aws">⚡ AWS Solution Architect (sa-aws)</option>
                     <option value="sa-microsoft">☁️ Azure Specialist (sa-microsoft)</option>
                     <option value="technical-writer">📝 Technical Writer (technical-writer)</option>
                     <option value="database-engineer">🗄️ Database Engineer (database-engineer)</option>
                     <option value="default">⚙️ Default Agent (default)</option>
-                  </>
+                  </optgroup>
+                )}
+
+                {/* Historical / Archived Known Assignees */}
+                {knownAssignees
+                  .map(ka => (typeof ka === 'string' ? ka : (ka as any)?.name))
+                  .filter((ka): ka is string => Boolean(ka) && !agents.some(a => a.id === ka)).length > 0 && (
+                  <optgroup label="Historical / Other Assignees">
+                    {knownAssignees
+                      .map(ka => (typeof ka === 'string' ? ka : (ka as any)?.name))
+                      .filter((ka): ka is string => Boolean(ka) && !agents.some(a => a.id === ka))
+                      .map(ka => (
+                        <option key={ka} value={ka}>
+                          📁 {ka} (archived/other)
+                        </option>
+                      ))}
+                  </optgroup>
                 )}
               </select>
             </div>
@@ -218,32 +268,32 @@ export const NewIssueModal: React.FC<NewIssueModalProps> = ({
 
           {/* Quick trigger option */}
           <div className="pt-2">
-            <label className="flex items-center gap-2 p-2 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-200/60 dark:border-blue-900/40 cursor-pointer text-xs select-none">
+            <label className="flex items-center gap-2.5 p-2.5 rounded-lg bg-orange-500/10 border border-orange-500/25 cursor-pointer text-xs select-none">
               <input
                 type="checkbox"
                 checked={runImmediately}
                 onChange={e => setRunImmediately(e.target.checked)}
-                className="rounded text-blue-600 focus:ring-blue-500 w-4 h-4 cursor-pointer"
+                className="rounded text-[#F97316] focus:ring-orange-500 w-4 h-4 cursor-pointer"
               />
               <span className="flex items-center gap-1.5 font-medium text-slate-800 dark:text-slate-200">
-                <Play className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <Play className="w-3.5 h-3.5 text-[#F97316] fill-[#F97316]" />
                 <span>⚡ Run Agent immediately after creation (Dispatch Now)</span>
               </span>
             </label>
           </div>
 
           {/* Actions */}
-          <div className="pt-3 border-t border-slate-200 dark:border-[#23272F] flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
-              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white shadow-xs"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white shadow-xs shadow-orange-500/20 active:scale-95 transition-all cursor-pointer"
             >
               <Plus className="w-3.5 h-3.5" />
               <span>{runImmediately ? 'Create & Run Agent' : 'Create Issue'}</span>

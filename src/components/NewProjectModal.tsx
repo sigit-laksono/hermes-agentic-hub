@@ -242,29 +242,29 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-xl rounded-xl border border-slate-200 dark:border-[#282D37] bg-white dark:bg-[#16191E] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 font-body">
+      <div className="w-full max-w-xl rounded-2xl border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100 flex flex-col max-h-[90vh]">
         {/* Modal Header */}
-        <div className="p-3.5 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between bg-slate-50/50 dark:bg-[#111317]">
-          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white">
-            <FolderGit2 className="w-4 h-4 text-blue-500" />
+        <div className="p-4 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between bg-slate-50/50 dark:bg-[#14161B]">
+          <div className="flex items-center gap-2 text-sm font-semibold text-slate-800 dark:text-white font-display">
+            <FolderGit2 className="w-4 h-4 text-[#F97316]" />
             <span>Board & Project Management</span>
           </div>
           <button
             onClick={onClose}
-            className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 cursor-pointer"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-slate-200 dark:border-[#23272F] bg-slate-100/60 dark:bg-[#14171D] text-xs px-3 pt-1.5 gap-1">
+        <div className="flex border-b border-[#E7E5E4] dark:border-[#2A2524] bg-slate-100/60 dark:bg-[#14161B] text-xs px-3 pt-1.5 gap-1 font-mono">
           <button
             onClick={() => setActiveTab('create')}
-            className={`px-3 py-1.5 rounded-t-md font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-t-lg font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'create'
-                ? 'bg-white dark:bg-[#16191E] text-blue-600 dark:text-blue-400 border-t border-x border-slate-200 dark:border-[#282D37]'
+                ? 'bg-white dark:bg-[#191C21] text-orange-600 dark:text-[#FB923C] border-t border-x border-[#E7E5E4] dark:border-[#2A2524]'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
             }`}
           >
@@ -273,9 +273,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('import')}
-            className={`px-3 py-1.5 rounded-t-md font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-t-lg font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'import'
-                ? 'bg-white dark:bg-[#16191E] text-blue-600 dark:text-blue-400 border-t border-x border-slate-200 dark:border-[#282D37]'
+                ? 'bg-white dark:bg-[#191C21] text-orange-600 dark:text-[#FB923C] border-t border-x border-[#E7E5E4] dark:border-[#2A2524]'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
             }`}
           >
@@ -284,9 +284,9 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           </button>
           <button
             onClick={() => setActiveTab('export')}
-            className={`px-3 py-1.5 rounded-t-md font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
+            className={`px-3 py-1.5 rounded-t-lg font-medium transition-colors flex items-center gap-1.5 cursor-pointer ${
               activeTab === 'export'
-                ? 'bg-white dark:bg-[#16191E] text-blue-600 dark:text-blue-400 border-t border-x border-slate-200 dark:border-[#282D37]'
+                ? 'bg-white dark:bg-[#191C21] text-orange-600 dark:text-[#FB923C] border-t border-x border-[#E7E5E4] dark:border-[#2A2524]'
                 : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-300'
             }`}
           >
@@ -311,13 +311,13 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   value={name}
                   onChange={e => setName(e.target.value)}
                   placeholder="e.g. Infrastructure Migration"
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2 text-xs rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none focus:border-[#F97316] transition-colors"
                 />
               </div>
 
               <div>
                 <div className="flex items-center justify-between mb-1">
-                  <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300">
+                  <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 font-mono">
                     Board Slug (Identifier)
                   </label>
                   <span className="text-[10px] text-slate-400 font-mono">lowercase, digits, hyphens</span>
@@ -328,29 +328,29 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   value={customSlug || computedSlug}
                   onChange={e => setCustomSlug(slugify(e.target.value))}
                   placeholder="e.g. infra-migration"
-                  className={`w-full px-3 py-2 text-xs font-mono rounded-lg border bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none ${
+                  className={`w-full px-3.5 py-2 text-xs font-mono rounded-lg border bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none transition-colors ${
                     !isSlugValid && computedSlug
                       ? 'border-rose-500 focus:border-rose-500'
                       : isSlugDuplicate
                       ? 'border-amber-500 focus:border-amber-500'
-                      : 'border-slate-200 dark:border-slate-700 focus:border-blue-500'
+                      : 'border-[#E7E5E4] dark:border-[#2A2524] focus:border-[#F97316]'
                   }`}
                 />
                 {isSlugDuplicate ? (
-                  <p className="mt-1 text-[11px] text-amber-500 flex items-center gap-1">
+                  <p className="mt-1 text-[11px] text-amber-500 flex items-center gap-1 font-mono">
                     <AlertCircle className="w-3 h-3" />
                     Slug already exists. Submitting will select or update the existing board.
                   </p>
                 ) : computedSlug && isSlugValid ? (
-                  <p className="mt-1 text-[11px] text-emerald-500 flex items-center gap-1">
+                  <p className="mt-1 text-[11px] text-emerald-500 flex items-center gap-1 font-mono">
                     <Check className="w-3 h-3" />
-                    Slug available: <span className="font-mono">{computedSlug}</span>
+                    Slug available: <span className="font-mono font-semibold">{computedSlug}</span>
                   </p>
                 ) : null}
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 mb-1 font-mono">
                   Default Working Directory <span className="text-slate-400 font-normal">(Optional repository path)</span>
                 </label>
                 <input
@@ -358,12 +358,12 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   value={defaultWorkdir}
                   onChange={e => setDefaultWorkdir(e.target.value)}
                   placeholder="e.g. /home/sigit/projects/migration-repo"
-                  className="w-full px-3 py-2 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+                  className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none focus:border-[#F97316] transition-colors"
                 />
               </div>
 
               <div>
-                <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 mb-1">
+                <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 mb-1 font-mono">
                   Project Shared Context <span className="text-slate-400 font-normal">(Architecture guidelines for agents)</span>
                 </label>
                 <textarea
@@ -371,7 +371,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   value={description}
                   onChange={e => setDescription(e.target.value)}
                   placeholder="e.g. Gunakan Terraform AWS Provider v5+, penamaan resource format kpc-prod-*..."
-                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-none leading-relaxed"
+                  className="w-full px-3.5 py-2 text-xs rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#F97316] resize-none leading-relaxed transition-colors"
                 />
               </div>
 
@@ -381,32 +381,32 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                   id="switch-immediately"
                   checked={switchImmediately}
                   onChange={e => setSwitchImmediately(e.target.checked)}
-                  className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="rounded border-[#E7E5E4] dark:border-[#2A2524] text-[#F97316] focus:ring-orange-500 cursor-pointer"
                 />
-                <label htmlFor="switch-immediately" className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer">
+                <label htmlFor="switch-immediately" className="text-xs text-slate-700 dark:text-slate-300 cursor-pointer select-none">
                   Switch to this board immediately after creation
                 </label>
               </div>
 
               {createError && (
-                <div className="p-2.5 rounded-md bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-1.5 border border-rose-200 dark:border-rose-900">
+                <div className="p-2.5 rounded-lg bg-rose-50 dark:bg-rose-950/30 text-rose-600 dark:text-rose-400 text-xs flex items-center gap-1.5 border border-rose-200 dark:border-rose-900">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                   <span>{createError}</span>
                 </div>
               )}
 
-              <div className="pt-3 border-t border-slate-200 dark:border-[#23272F] flex items-center justify-end gap-2">
+              <div className="pt-3 border-t border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-end gap-2">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={saving || !name.trim() || !computedSlug || !isSlugValid}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white shadow-xs shadow-orange-500/20 disabled:opacity-50 cursor-pointer active:scale-95 transition-all"
                 >
                   {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Plus className="w-3.5 h-3.5" />}
                   <span>Create Board</span>
@@ -419,10 +419,10 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           {activeTab === 'import' && (
             <form onSubmit={handleImportSubmit} className="space-y-4">
               <div>
-                <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 mb-1.5">
+                <label className="block text-[11px] font-medium text-slate-700 dark:text-slate-300 mb-1.5 font-mono">
                   Select Board Backup JSON File
                 </label>
-                <div className="border-2 border-dashed border-slate-200 dark:border-slate-700 rounded-xl p-5 text-center hover:border-blue-500 transition-colors bg-slate-50/50 dark:bg-[#1A1D24]/50">
+                <div className="border-2 border-dashed border-[#E7E5E4] dark:border-[#2A2524] rounded-2xl p-6 text-center hover:border-[#F97316] transition-colors bg-slate-50/50 dark:bg-[#14161B]/50">
                   <input
                     type="file"
                     id="json-file-input"
@@ -431,7 +431,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                     className="hidden"
                   />
                   <label htmlFor="json-file-input" className="cursor-pointer flex flex-col items-center gap-2">
-                    <FileCode className="w-8 h-8 text-blue-500" />
+                    <FileCode className="w-8 h-8 text-[#F97316]" />
                     <span className="text-xs font-medium text-slate-800 dark:text-slate-200">
                       {importJsonFile ? importJsonFile.name : 'Choose a JSON file or drag it here'}
                     </span>
@@ -500,14 +500,14 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                 <button
                   type="button"
                   onClick={onClose}
-                  className="px-3 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                  className="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={importing || !parsedImportData || !importSlug}
-                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-medium bg-blue-600 hover:bg-blue-700 text-white shadow-xs disabled:opacity-50 cursor-pointer"
+                  className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white shadow-xs shadow-orange-500/20 disabled:opacity-50 cursor-pointer active:scale-95 transition-all"
                 >
                   {importing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
                   <span>Import Board</span>
@@ -519,19 +519,19 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
           {/* TAB 3: EXPORT & BACKUP */}
           {activeTab === 'export' && (
             <div className="space-y-3">
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 font-body">
                 Download a portable backup file of any existing Kanban board to your computer or trigger an archive snapshot on the host.
               </p>
 
-              <div className="divide-y divide-slate-100 dark:divide-[#23272F] border border-slate-200 dark:border-[#23272F] rounded-lg overflow-hidden">
+              <div className="divide-y divide-slate-100 dark:divide-[#2A2524] border border-[#E7E5E4] dark:border-[#2A2524] rounded-xl overflow-hidden">
                 {existingBoards.map(b => {
                   const slug = b.slug || b.id || ''
                   const isBusy = exportingSlug === slug
 
                   return (
-                    <div key={slug} className="p-3 flex items-center justify-between bg-white dark:bg-[#16191E]">
+                    <div key={slug} className="p-3.5 flex items-center justify-between bg-white dark:bg-[#14161B]">
                       <div>
-                        <div className="font-semibold text-xs text-slate-800 dark:text-white flex items-center gap-1.5">
+                        <div className="font-semibold text-xs text-slate-800 dark:text-white flex items-center gap-1.5 font-display">
                           <span>📁</span>
                           <span>{b.name}</span>
                         </div>
@@ -544,7 +544,7 @@ export const NewProjectModal: React.FC<NewProjectModalProps> = ({
                         <button
                           onClick={() => handleExportJson(slug)}
                           disabled={isBusy}
-                          className="flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-slate-100 dark:bg-slate-800 hover:bg-blue-50 dark:hover:bg-blue-950/40 text-slate-700 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 border border-slate-200 dark:border-slate-700 transition-colors cursor-pointer disabled:opacity-50"
+                          className="flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-100 dark:bg-[#191C21] hover:bg-orange-500/10 text-slate-700 dark:text-slate-300 hover:text-[#F97316] dark:hover:text-[#FB923C] border border-[#E7E5E4] dark:border-[#2A2524] transition-colors cursor-pointer disabled:opacity-50"
                         >
                           {isBusy ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />}
                           <span>Export JSON</span>

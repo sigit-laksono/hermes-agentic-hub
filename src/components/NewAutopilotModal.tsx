@@ -60,20 +60,20 @@ export const NewAutopilotModal: React.FC<NewAutopilotModalProps> = ({ isOpen, on
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4">
-      <div className="w-full max-w-lg rounded-xl border border-slate-200 dark:border-[#282D37] bg-white dark:bg-[#16191E] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
-        <div className="p-3.5 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between">
-          <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2 text-sm">
-            <Zap className="w-4 h-4 text-amber-500" /> New Autopilot
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 font-body">
+      <div className="w-full max-w-lg rounded-2xl border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100">
+        <div className="p-4 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between bg-slate-50/50 dark:bg-[#14161B]">
+          <h3 className="font-semibold text-slate-800 dark:text-white flex items-center gap-2 text-sm font-display">
+            <Zap className="w-4 h-4 text-[#F97316]" /> New Autopilot
           </h3>
-          <button onClick={onClose} className="p-1 rounded text-slate-400 hover:text-slate-700 dark:hover:text-slate-200">
+          <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-4 space-y-3.5">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <div>
-            <label className="block text-[11px] text-slate-500 mb-1">Name</label>
+            <label className="block text-[11px] text-slate-500 mb-1 font-mono">Name</label>
             <input
               type="text"
               required
@@ -81,7 +81,7 @@ export const NewAutopilotModal: React.FC<NewAutopilotModalProps> = ({ isOpen, on
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="e.g. Daily Cost Monitoring"
-              className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-900 dark:text-white focus:outline-none focus:border-blue-500"
+              className="w-full px-3.5 py-2 text-sm rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-900 dark:text-white focus:outline-none focus:border-[#F97316] transition-colors"
             />
           </div>
 
@@ -117,7 +117,7 @@ export const NewAutopilotModal: React.FC<NewAutopilotModalProps> = ({ isOpen, on
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-500 mb-1">
+            <label className="block text-[11px] text-slate-500 mb-1 font-mono">
               Cron expression <span className="font-mono text-slate-400">({schedule})</span>
             </label>
             <input
@@ -125,36 +125,36 @@ export const NewAutopilotModal: React.FC<NewAutopilotModalProps> = ({ isOpen, on
               value={schedule}
               onChange={e => setSchedule(e.target.value)}
               placeholder="0 */2 * * *"
-              className="w-full px-3 py-1.5 text-xs font-mono rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500"
+              className="w-full px-3.5 py-2 text-xs font-mono rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#F97316] transition-colors"
             />
           </div>
 
           <div>
-            <label className="block text-[11px] text-slate-500 mb-1">Prompt / Task instruction</label>
+            <label className="block text-[11px] text-slate-500 mb-1 font-mono">Prompt / Task instruction</label>
             <textarea
               rows={4}
               required
               value={prompt}
               onChange={e => setPrompt(e.target.value)}
               placeholder="Describe what the agent should do on each run..."
-              className="w-full px-3 py-2 text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-[#1A1D24] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-none"
+              className="w-full px-3.5 py-2 text-xs rounded-lg border border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#14161B] text-slate-800 dark:text-slate-200 focus:outline-none focus:border-[#F97316] resize-none transition-colors"
             />
           </div>
 
-          {error && <p className="text-[11px] text-rose-500">{error}</p>}
+          {error && <p className="text-[11px] text-rose-500 font-mono">{error}</p>}
 
-          <div className="pt-3 border-t border-slate-200 dark:border-[#23272F] flex items-center justify-end gap-2">
+          <div className="pt-3 border-t border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={onClose}
-              className="px-3 py-1.5 rounded text-xs text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800"
+              className="px-3.5 py-1.5 rounded-lg text-xs text-slate-600 dark:text-slate-400 hover:bg-black/5 dark:hover:bg-white/5 cursor-pointer transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white shadow-xs disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white shadow-xs shadow-orange-500/20 disabled:opacity-50 cursor-pointer active:scale-95 transition-all"
             >
               {saving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Zap className="w-3.5 h-3.5" />}
               <span>Create Autopilot</span>

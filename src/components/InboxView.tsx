@@ -38,7 +38,7 @@ export const InboxView: React.FC<InboxViewProps> = ({
   onRefreshTasks
 }) => {
   // Reviewable/recent tasks
-  const reviewTasks = tasks.filter(t => t.status === 'in_review' || t.status === 'done')
+  const reviewTasks = tasks.filter(t => t.status === 'review' || t.status === 'done')
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(
     reviewTasks.length > 0 ? reviewTasks[0].id : null
   )
@@ -197,26 +197,26 @@ export const InboxView: React.FC<InboxViewProps> = ({
   }
 
   return (
-    <div className="flex-1 flex h-[calc(100vh-3rem)] overflow-hidden bg-white dark:bg-[#0D0F12]">
+    <div className="flex-1 flex h-[calc(100vh-3rem)] overflow-hidden bg-[#FAF9F9] dark:bg-[#0F1115] font-body">
       {/* Left Pane: Notification List */}
-      <div className="w-80 border-r border-slate-200 dark:border-[#23272F] flex flex-col bg-slate-50 dark:bg-[#111317]">
-        <div className="p-3 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between">
+      <div className="w-80 border-r border-[#E7E5E4] dark:border-[#2A2524] flex flex-col bg-slate-50 dark:bg-[#14161B]">
+        <div className="p-3.5 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Inbox className="w-4 h-4 text-blue-500" />
-            <h2 className="text-xs font-semibold text-slate-800 dark:text-white">Human-in-the-Loop Inbox</h2>
-            <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-blue-500/10 text-blue-500 font-bold">
-              {reviewTasks.filter(t => t.status === 'in_review').length}
+            <Inbox className="w-4 h-4 text-[#F97316]" />
+            <h2 className="text-xs font-semibold text-slate-800 dark:text-white font-display">Human-in-the-Loop Inbox</h2>
+            <span className="text-[11px] font-mono px-1.5 py-0.2 rounded-full bg-orange-500/10 text-[#F97316] font-bold">
+              {reviewTasks.filter(t => t.status === 'review').length}
             </span>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto divide-y divide-slate-200/60 dark:divide-[#1E222A]">
+        <div className="flex-1 overflow-y-auto divide-y divide-slate-200/60 dark:divide-[#2A2524]">
           {reviewTasks.length === 0 ? (
             <div className="p-6 text-center text-xs text-slate-400">All caught up! No tasks need review.</div>
           ) : (
             reviewTasks.map(task => {
               const isSelected = task.id === selectedTaskId
-              const isPendingReview = task.status === 'in_review'
+              const isPendingReview = task.status === 'review'
 
               return (
                 <div
@@ -227,22 +227,22 @@ export const InboxView: React.FC<InboxViewProps> = ({
                   }}
                   className={`p-3 cursor-pointer transition-colors text-xs ${
                     isSelected
-                      ? 'bg-blue-50 dark:bg-blue-950/40 border-l-2 border-blue-500'
-                      : 'hover:bg-slate-100 dark:hover:bg-slate-800/40'
+                      ? 'bg-orange-500/10 dark:bg-orange-950/30 border-l-2 border-[#F97316]'
+                      : 'hover:bg-slate-100/60 dark:hover:bg-white/5'
                   }`}
                 >
                   <div className="flex items-start justify-between gap-2 mb-1">
                     <div className="flex items-center gap-1.5 overflow-hidden">
                       <span
                         className={`w-2 h-2 rounded-full shrink-0 ${
-                          isPendingReview ? 'bg-amber-500 animate-pulse' : 'bg-blue-500'
+                          isPendingReview ? 'bg-amber-500 animate-pulse' : 'bg-emerald-500'
                         }`}
                       />
                       <span className="font-semibold text-slate-800 dark:text-slate-200 line-clamp-1">
                         {task.title}
                       </span>
                     </div>
-                    <span className="text-[10px] text-slate-400 shrink-0">{task.updatedAt}</span>
+                    <span className="text-[10px] text-slate-400 shrink-0 font-mono">{task.updatedAt}</span>
                   </div>
 
                   <div className="flex items-center justify-between mt-1 text-[11px] text-slate-500 dark:text-slate-400">
@@ -267,15 +267,15 @@ export const InboxView: React.FC<InboxViewProps> = ({
       </div>
 
       {/* Right Pane: Detail & Verification Workspace */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white dark:bg-[#14171D]">
+      <div className="flex-1 flex flex-col h-full overflow-hidden bg-white dark:bg-[#191C21]">
         {selectedTask ? (
           <div className="flex-1 flex flex-col h-full">
             {/* Header bar */}
-            <div className="p-4 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between bg-slate-50/50 dark:bg-[#111317]">
+            <div className="p-4 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between bg-slate-50/50 dark:bg-[#14161C]">
               <div>
                 <div className="flex items-center gap-2 text-xs text-slate-400 mb-1">
-                  <span className="font-mono font-bold text-slate-600 dark:text-slate-300">
-                    {selectedTask.id}
+                  <span className="font-mono font-bold text-[#F97316]">
+                    {selectedTask.displayId || selectedTask.id}
                   </span>
                   <span>•</span>
                   <span>{selectedTask.projectName}</span>
@@ -284,14 +284,14 @@ export const InboxView: React.FC<InboxViewProps> = ({
                     Assigned: {selectedTask.assigneeAvatar} {selectedTask.assigneeName}
                   </span>
                 </div>
-                <h3 className="text-sm font-semibold text-slate-900 dark:text-white">
+                <h3 className="text-base font-semibold text-slate-900 dark:text-white font-display">
                   {selectedTask.title}
                 </h3>
               </div>
 
               {/* Action Buttons */}
               <div className="flex items-center gap-2">
-                {selectedTask.status === 'in_review' ? (
+                {selectedTask.status === 'review' ? (
                   <>
                     <button
                       onClick={handleRequestChanges}
@@ -302,14 +302,14 @@ export const InboxView: React.FC<InboxViewProps> = ({
                     </button>
                     <button
                       onClick={handleApprove}
-                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white transition-all shadow-xs active:scale-95 cursor-pointer"
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white transition-all shadow-xs shadow-orange-500/20 active:scale-95 cursor-pointer"
                     >
                       <CheckCircle2 className="w-3.5 h-3.5" />
                       <span>Approve & Done</span>
                     </button>
                   </>
                 ) : (
-                  <span className="flex items-center gap-1 text-xs text-blue-500 font-medium px-2.5 py-1 rounded-full bg-blue-50 dark:bg-blue-950/40 border border-blue-500/20">
+                  <span className="flex items-center gap-1 text-xs text-emerald-500 font-medium px-2.5 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-500/20">
                     <CheckCircle2 className="w-3.5 h-3.5" /> Approved & Completed
                   </span>
                 )}
@@ -317,16 +317,16 @@ export const InboxView: React.FC<InboxViewProps> = ({
             </div>
 
             {/* Subheader: Review Tabs */}
-            <div className="px-6 pt-3 border-b border-slate-200 dark:border-[#23272F] flex items-center gap-4 text-xs font-medium bg-white dark:bg-[#14171D]">
+            <div className="px-6 pt-3 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center gap-4 text-xs font-medium bg-white dark:bg-[#14161C]">
               <button
                 onClick={() => setActiveTab('summary')}
                 className={`pb-2.5 flex items-center gap-1.5 transition-colors border-b-2 cursor-pointer ${
                   activeTab === 'summary'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    ? 'border-[#F97316] text-orange-600 dark:text-[#FB923C] font-semibold'
                     : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
-                <Sparkles className="w-3.5 h-3.5" />
+                <Sparkles className="w-3.5 h-3.5 text-[#F97316]" />
                 <span>Executive Summary</span>
               </button>
 
@@ -334,14 +334,14 @@ export const InboxView: React.FC<InboxViewProps> = ({
                 onClick={() => setActiveTab('deliverables')}
                 className={`pb-2.5 flex items-center gap-1.5 transition-colors border-b-2 cursor-pointer ${
                   activeTab === 'deliverables'
-                    ? 'border-blue-500 text-blue-600 dark:text-blue-400'
+                    ? 'border-[#F97316] text-orange-600 dark:text-[#FB923C] font-semibold'
                     : 'border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                 }`}
               >
                 <FileCode className="w-3.5 h-3.5" />
                 <span>Deliverables & Files</span>
                 {attachments.length > 0 && (
-                  <span className="px-1.5 py-0.2 rounded-full bg-blue-500/20 text-blue-500 text-[10px] font-semibold">
+                  <span className="px-1.5 py-0.2 rounded-full bg-orange-500/20 text-[#F97316] text-[10px] font-semibold">
                     {attachments.length}
                   </span>
                 )}
