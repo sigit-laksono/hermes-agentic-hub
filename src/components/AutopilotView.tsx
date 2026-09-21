@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Zap, Plus, Clock, Play, Pause, Loader2 } from 'lucide-react'
+import { Zap, Plus, Clock, Play, Pause, Loader2, Edit2, Trash2, History } from 'lucide-react'
 import { AutopilotJob } from '../types'
 
 interface AutopilotViewProps {
@@ -7,17 +7,25 @@ interface AutopilotViewProps {
   onRunNow: (jobId: string) => Promise<void> | void
   onToggleStatus: (jobId: string, current: AutopilotJob['status']) => Promise<void> | void
   onNewAutopilot: () => void
+  onEditAutopilot?: (job: AutopilotJob) => void
+  onDeleteAutopilot?: (jobId: string) => Promise<void> | void
+  onViewHistory?: (jobId: string) => void
 }
 
 export const AutopilotView: React.FC<AutopilotViewProps> = ({
   autopilots,
   onRunNow,
   onToggleStatus,
-  onNewAutopilot
+  onNewAutopilot,
+  onEditAutopilot,
+  onDeleteAutopilot,
+  onViewHistory
 }) => {
   // Per-row busy state keyed by job id so only the acted row shows a spinner.
   const [runningId, setRunningId] = useState<string | null>(null)
   const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
   const handleRun = async (jobId: string) => {
     if (runningId) return
@@ -36,6 +44,17 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
       await onToggleStatus(job.id, job.status)
     } finally {
       setTogglingId(null)
+    }
+  }
+
+  const handleDelete = async (jobId: string) => {
+    if (!onDeleteAutopilot || deletingId) return
+    setDeletingId(jobId)
+    try {
+      await onDeleteAutopilot(jobId)
+      setConfirmDeleteId(null)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -73,7 +92,7 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
               <th className="py-2.5 px-4 font-medium">Trigger</th>
               <th className="py-2.5 px-4 font-medium">Last Run</th>
               <th className="py-2.5 px-4 font-medium">Next Run</th>
-              <th className="py-2.5 px-4 font-medium">Action</th>
+              <th className="py-2.5 px-4 font-medium text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#2A2524]">
@@ -105,7 +124,29 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
                   {job.nextRun}
                 </td>
                 <td className="py-3 px-4">
-                  <div className="flex items-center gap-1.5">
+                  <div className="flex items-center justify-end gap-1.5">
+                    {/* History button */}
+                    {onViewHistory && (
+                      <button
+                        onClick={() => onViewHistory(job.id)}
+                        title="View execution history"
+                        className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#191C21] hover:bg-slate-200 dark:hover:bg-[#2A2524] text-slate-600 dark:text-slate-400 border border-[#E7E5E4] dark:border-[#2A2524] cursor-pointer transition-colors"
+                      >
+                        <History className="w-3 h-3" />
+                      </button>
+                    )}
+
+                    {/* Edit button */}
+                    {onEditAutopilot && (
+                      <button
+                        onClick={() => onEditAutopilot(job)}
+                        title="Edit autopilot"
+                        className="px-2 py-1 rounded-lg bg-slate-100 dark:bg-[#191C21] hover:bg-slate-200 dark:hover:bg-[#2A2524] text-slate-600 dark:text-slate-400 border border-[#E7E5E4] dark:border-[#2A2524] cursor-pointer transition-colors"
+                      >
+                        <Edit2 className="w-3 h-3" />
+                      </button>
+                    )}
+
                     {/* Pause / Resume toggle reflecting live enabled state */}
                     <button
                       onClick={() => handleToggle(job)}
@@ -140,6 +181,36 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
                       )}
                       <span>{runningId === job.id ? 'Running…' : 'Run now'}</span>
                     </button>
+
+                    {/* Delete button with confirmation */}
+                    {onDeleteAutopilot && (
+                      confirmDeleteId === job.id ? (
+                        <div className="flex items-center gap-1">
+                          <button
+                            onClick={() => handleDelete(job.id)}
+                            disabled={deletingId === job.id}
+                            className="px-2 py-1 rounded-lg bg-rose-500 hover:bg-rose-600 text-white text-[11px] font-medium disabled:opacity-50 cursor-pointer transition-colors"
+                          >
+                            {deletingId === job.id ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirm'}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDeleteId(null)}
+                            disabled={deletingId === job.id}
+                            className="px-2 py-1 rounded-lg bg-slate-200 dark:bg-[#2A2524] hover:bg-slate-300 dark:hover:bg-[#34383F] text-slate-700 dark:text-slate-300 text-[11px] font-medium cursor-pointer transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDeleteId(job.id)}
+                          title="Delete autopilot"
+                          className="px-2 py-1 rounded-lg bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-900/40 text-rose-600 dark:text-rose-400 border border-rose-500/20 cursor-pointer transition-colors"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      )
+                    )}
                   </div>
                 </td>
               </tr>

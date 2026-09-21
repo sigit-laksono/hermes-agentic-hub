@@ -952,6 +952,100 @@ export const hermesApi = {
     }
   },
 
+  // TASK-1.5: Delete agent profile
+  async deleteProfile(name: string): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(name)}`, {
+        method: 'DELETE'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to delete profile' }
+    }
+  },
+
+  // TASK-1.5: Export agent profile
+  async exportProfile(name: string): Promise<{ ok: boolean; data?: any; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(name)}/export`, {
+        method: 'POST'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      const data = await res.json()
+      return { ok: true, data }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to export profile' }
+    }
+  },
+
+  // TASK-1.5: Import agent profile
+  async importProfile(fileData: any): Promise<{ ok: boolean; name?: string; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/import`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fileData)
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      const data = await res.json()
+      return { ok: true, name: data.name }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to import profile' }
+    }
+  },
+
+  // TASK-1.5: Get active profile
+  async getActiveProfile(): Promise<{ profile?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/active`)
+      if (!res.ok) return {}
+      return res.json()
+    } catch {
+      return {}
+    }
+  },
+
+  // TASK-1.5: Set active profile
+  async setActiveProfile(name: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/active`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ profile: name })
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  // TASK-1.6: AI Auto-Describe Profile
+  async autoDescribeProfile(name: string): Promise<{ ok: boolean; description?: string; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/profiles/${encodeURIComponent(name)}/auto-describe`, {
+        method: 'POST'
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      const data = await res.json()
+      return { ok: true, description: data.description }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to auto-describe profile' }
+    }
+  },
+
   async getProfileSkills(profileName: string): Promise<Skill[]> {
     try {
       const res = await fetch(`${API_BASE}/api/skills?profile=${encodeURIComponent(profileName)}`)
@@ -1098,6 +1192,59 @@ export const hermesApi = {
     }
   },
 
+  // TASK-1.1: Update an existing cron job
+  async updateCronJob(jobId: string, params: {
+    name?: string
+    schedule?: string
+    prompt?: string
+    profile?: string
+    enabled?: boolean
+  }): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  // TASK-1.1: Delete a cron job
+  async deleteCronJob(jobId: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}`, {
+        method: 'DELETE'
+      })
+      return res.ok
+    } catch {
+      return false
+    }
+  },
+
+  // TASK-1.2: Get cron job execution history
+  async getCronJobHistory(jobId: string): Promise<{
+    runs: Array<{
+      id: string
+      started_at: number
+      ended_at?: number
+      status: 'success' | 'failed' | 'running'
+      duration_seconds?: number
+      summary?: string
+      error?: string
+    }>
+  }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}/history`)
+      if (!res.ok) return { runs: [] }
+      return res.json()
+    } catch {
+      return { runs: [] }
+    }
+  },
+
   // 4. Skills Catalog
   async getSkills(): Promise<Skill[]> {
     try {
@@ -1119,6 +1266,43 @@ export const hermesApi = {
       }))
     } catch {
       return []
+    }
+  },
+
+  // TASK-1.3: Create a new custom skill
+  async createSkill(payload: {
+    name: string
+    description?: string
+    category?: string
+    content: string
+  }): Promise<{ ok: boolean; message?: string }> {
+    try {
+      const res = await fetch(`${API_BASE}/api/skills`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        return { ok: false, message: err.detail || res.statusText }
+      }
+      return { ok: true }
+    } catch (err: any) {
+      return { ok: false, message: err.message || 'Failed to create skill' }
+    }
+  },
+
+  // TASK-1.3: Update skill content (SKILL.md)
+  async updateSkillContent(name: string, content: string): Promise<boolean> {
+    try {
+      const res = await fetch(`${API_BASE}/api/skills/${encodeURIComponent(name)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ content })
+      })
+      return res.ok
+    } catch {
+      return false
     }
   },
 

@@ -12,19 +12,16 @@ import { ChatView } from './components/ChatView'
 import { NewIssueModal } from './components/NewIssueModal'
 import { SearchModal } from './components/SearchModal'
 import { NewAutopilotModal } from './components/NewAutopilotModal'
+import { CronHistoryDrawer } from './components/CronHistoryDrawer'
 import { NewProjectModal } from './components/NewProjectModal'
 import { BulkActionToolbar } from './components/BulkActionToolbar'
 import { ToastStack, ToastItem, ToastKind } from './components/ToastStack'
 import { hermesApi } from './api/hermesApi'
 import {
   initialTasks,
-  initialProjects,
-  initialAutopilots,
-  initialAgents,
-  initialSquads,
-  initialSkills
+  initialProjects
 } from './data/mockData'
-import { ViewTab, Task, TaskStatus, Priority, Board, Project, BoardStats, KanbanConfig, formatDisplayId } from './types'
+import { ViewTab, Task, TaskStatus, Priority, Board, Project, BoardStats, KanbanConfig, formatDisplayId, AIAgent, Squad, Skill, AutopilotJob } from './types'
 
 export const AppContent: React.FC = () => {
   const [activeTab, setActiveTab] = useState<ViewTab>('my_issues')
@@ -42,10 +39,10 @@ export const AppContent: React.FC = () => {
   const [boards, setBoards] = useState<Board[]>([])
   const [tasks, setTasks] = useState<Task[]>(initialTasks)
   const [projects, setProjects] = useState<Project[]>(initialProjects)
-  const [autopilots, setAutopilots] = useState(initialAutopilots)
-  const [agents, setAgents] = useState(initialAgents)
-  const [squads, setSquads] = useState(initialSquads)
-  const [skills, setSkills] = useState(initialSkills)
+  const [autopilots, setAutopilots] = useState<AutopilotJob[]>([])
+  const [agents, setAgents] = useState<AIAgent[]>([])
+  const [squads, setSquads] = useState<Squad[]>([])
+  const [skills, setSkills] = useState<Skill[]>([])
   const [activeWorkersCount, setActiveWorkersCount] = useState<number>(0)
   const [boardStats, setBoardStats] = useState<BoardStats | null>(null)
   const [kanbanConfig, setKanbanConfig] = useState<KanbanConfig>({
@@ -137,27 +134,19 @@ export const AppContent: React.FC = () => {
 
       // 1. Fetch live profiles
       const liveProfiles = await hermesApi.getProfiles()
-      if (liveProfiles.length > 0) {
-        setAgents(liveProfiles)
-      }
+      setAgents(liveProfiles)
 
       // 2. Fetch live cron jobs
       const liveJobs = await hermesApi.getCronJobs()
-      if (liveJobs.length > 0) {
-        setAutopilots(liveJobs)
-      }
+      setAutopilots(liveJobs)
 
       // 3. Fetch live skills
       const liveSkills = await hermesApi.getSkills()
-      if (liveSkills.length > 0) {
-        setSkills(liveSkills)
-      }
+      setSkills(liveSkills)
 
       // 3b. Fetch live squads (derived from orchestration + profiles)
       const liveSquads = await hermesApi.getSquads()
-      if (liveSquads.length > 0) {
-        setSquads(liveSquads)
-      }
+      setSquads(liveSquads)
 
       // 4. Fetch active workers count
       const workers = await hermesApi.getActiveWorkers()
@@ -799,6 +788,61 @@ export const AppContent: React.FC = () => {
     }
   }
 
+  // TASK-1.1: Edit Autopilot
+  const [editingAutopilot, setEditingAutopilot] = useState<AutopilotJob | null>(null)
+
+  const handleEditAutopilot = (job: AutopilotJob) => {
+    setEditingAutopilot(job)
+    setIsNewAutopilotOpen(true)
+  }
+
+  const handleUpdateAutopilot = async (jobId: string, params: {
+    name: string
+    schedule: string
+    prompt?: string
+    profile: string
+  }) => {
+    // Only send fields that are present
+    const updatePayload: any = {
+      name: params.name,
+      schedule: params.schedule,
+      profile: params.profile
+    }
+
+    // Only include prompt if it's provided (not empty)
+    if (params.prompt && params.prompt.trim()) {
+      updatePayload.prompt = params.prompt
+    }
+
+    const ok = await hermesApi.updateCronJob(jobId, updatePayload)
+    if (ok) {
+      pushToast('success', 'Autopilot updated', `Job "${params.name}" has been updated successfully.`)
+      loadLiveData()
+      return true
+    } else {
+      pushToast('error', 'Update failed', 'Could not update autopilot job.')
+      return false
+    }
+  }
+
+  // TASK-1.1: Delete Autopilot
+  const handleDeleteAutopilot = async (jobId: string) => {
+    const ok = await hermesApi.deleteCronJob(jobId)
+    if (ok) {
+      pushToast('success', 'Autopilot deleted', 'Job has been removed from scheduler.')
+      loadLiveData()
+    } else {
+      pushToast('error', 'Delete failed', 'Could not delete autopilot job.')
+    }
+  }
+
+  // TASK-1.2: View History
+  const [historyJobId, setHistoryJobId] = useState<string | null>(null)
+
+  const handleViewHistory = (jobId: string) => {
+    setHistoryJobId(jobId)
+  }
+
   const handleRunAgent = async (taskId: string) => {
     let target = tasks.find(t => t.id === taskId)
     if (!target) return
@@ -1155,6 +1199,9 @@ export const AppContent: React.FC = () => {
               onRunNow={handleRunAutopilot}
               onToggleStatus={handleToggleAutopilot}
               onNewAutopilot={() => setIsNewAutopilotOpen(true)}
+              onEditAutopilot={handleEditAutopilot}
+              onDeleteAutopilot={handleDeleteAutopilot}
+              onViewHistory={handleViewHistory}
             />
           )}
 
@@ -1243,8 +1290,21 @@ export const AppContent: React.FC = () => {
       {/* New Autopilot Modal */}
       <NewAutopilotModal
         isOpen={isNewAutopilotOpen}
-        onClose={() => setIsNewAutopilotOpen(false)}
+        onClose={() => {
+          setIsNewAutopilotOpen(false)
+          setEditingAutopilot(null)
+        }}
         onCreate={handleCreateAutopilot}
+        onUpdate={handleUpdateAutopilot}
+        editJob={editingAutopilot}
+        availableProfiles={agents}
+      />
+
+      {/* Cron Job History Drawer (TASK-1.2) */}
+      <CronHistoryDrawer
+        jobId={historyJobId}
+        jobName={autopilots.find(j => j.id === historyJobId)?.name}
+        onClose={() => setHistoryJobId(null)}
       />
 
       {/* New Project Modal */}
