@@ -1,4 +1,4 @@
-export type TaskStatus = 'backlog' | 'todo' | 'in_progress' | 'in_review' | 'blocked' | 'done'
+export type TaskStatus = 'triage' | 'todo' | 'scheduled' | 'ready' | 'running' | 'blocked' | 'review' | 'done' | 'archived'
 
 export type Priority = 'urgent' | 'high' | 'medium' | 'low' | 'none'
 
@@ -119,9 +119,42 @@ export interface TaskDetailsResponse {
   estimate?: TaskEstimateResult
 }
 
+export interface BoardStats {
+  total?: number
+  byStatus?: Record<string, number>
+  byAssignee?: Record<string, number>
+  activeWorkers?: number
+  oldestReadyAgeSeconds?: number
+  /** Derived client-side from oldestReadyAgeSeconds; GET /stats reports only the age. */
+  oldestReadyAgeFormatted?: string
+}
+
+export interface KanbanConfig {
+  default_tenant?: string
+  lane_by_profile?: boolean
+  include_archived_by_default?: boolean
+  render_markdown?: boolean
+  [key: string]: any
+}
+
+export interface HomeChannel {
+  platform: string
+  label: string
+  enabled: boolean
+  subscribed?: boolean
+}
+
+export function formatDisplayId(id?: string, displayId?: string): string {
+  if (displayId) return displayId
+  if (!id) return ''
+  if (id.startsWith('t_')) return `#${id.slice(2, 9)}`
+  return id
+}
+
 export interface Task {
-  id: string              // e.g. "DIK-55" (UI display id)
+  id: string              // Hermes canonical id (e.g. "t_663b67ed") or mock id
   rawId?: string          // canonical Hermes id (e.g. "t_663b67ed") — present only for live tasks
+  displayId?: string      // Human-friendly short display ID (e.g. "#663b67e" or "DIK-55")
   title: string
   description?: string
   status: TaskStatus
@@ -145,6 +178,8 @@ export interface Task {
   blockedBy?: string[]
   estimate?: TaskEstimateResult
   linkCounts?: { parents: number; children: number }
+  diagnostics?: { kind: string; severity: 'warning' | 'error' | 'critical'; message: string }[]
+  warnings?: string[]
   executionMetrics?: {
     tokens?: string
     cost?: string
@@ -300,8 +335,59 @@ export interface ToolCall {
   args?: any
   output?: string
   summary?: string
-  status?: 'running' | 'completed' | 'error'
+  status?: 'running' | 'completed' | 'error' | 'failed'
   started_at?: number
+  completed_at?: number
+  duration_seconds?: number
+  is_error?: boolean
+}
+
+export interface ChatMeteringData {
+  tps?: number
+  input_tokens?: number
+  output_tokens?: number
+  estimated_cost?: number
+  cache_read_tokens?: number
+  cache_write_tokens?: number
+  turn_cache_hit_percent?: number
+  duration_seconds?: number
+  context_length?: number
+  threshold_tokens?: number
+}
+
+export interface PendingApproval {
+  id: string
+  approval_id?: string
+  tool_name: string
+  description?: string
+  args?: any
+  danger_level?: 'low' | 'medium' | 'high'
+  pending_count?: number
+  session_id?: string
+  status?: 'pending' | 'approved' | 'denied'
+  decision?: 'once' | 'session' | 'always' | 'deny'
+  created_at?: number
+}
+
+export interface PendingClarify {
+  clarify_id: string
+  id?: string
+  session_id?: string
+  question: string
+  options?: string[]
+  allow_custom?: boolean
+  selected_answer?: string
+  status?: 'pending' | 'answered'
+}
+
+export interface ChatMessageAttachment {
+  id: string
+  name: string
+  type: string
+  size: number
+  dataUrl?: string
+  textContent?: string
+  isImage: boolean
 }
 
 export interface ChatMessage {
@@ -315,6 +401,7 @@ export interface ChatMessage {
   reasoning?: string
   timestamp?: number | string
   isStreaming?: boolean
+  attachments?: ChatMessageAttachment[]
 }
 
 export interface ChatSession {
@@ -328,6 +415,7 @@ export interface ChatSession {
   is_active?: boolean
   preview?: string
   unread?: boolean
+  yolo_mode?: boolean
 }
 
 export type ChatConnectionState = 'connecting' | 'connected' | 'streaming' | 'error' | 'disconnected'

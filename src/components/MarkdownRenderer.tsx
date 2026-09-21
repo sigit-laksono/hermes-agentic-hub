@@ -6,14 +6,24 @@ import { Check } from 'lucide-react'
 interface MarkdownRendererProps {
   content: string | null | undefined
   className?: string
+  renderMarkdown?: boolean
   onImageClick?: (src: string, alt?: string) => void
 }
 
 export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
   content,
   className = '',
+  renderMarkdown = true,
   onImageClick
 }) => {
+  if (!renderMarkdown && content) {
+    return (
+      <div className={`whitespace-pre-wrap font-sans text-xs text-slate-300 leading-relaxed ${className}`}>
+        {content}
+      </div>
+    )
+  }
+
   const tokens = useMemo(() => {
     if (!content) return []
     try {
@@ -24,8 +34,8 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
     }
   }, [content])
 
-  if (!content) {
-    return <p className="text-slate-500 italic text-xs">No content provided.</p>
+  if (!content || !content.trim()) {
+    return null
   }
 
   // Render inline HTML safely
@@ -124,11 +134,11 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   <li key={i} className="flex items-start gap-2 py-0.5">
                     <span className="mt-0.5 shrink-0">
                       {it.checked ? (
-                        <span className="w-3.5 h-3.5 rounded bg-blue-600 text-white flex items-center justify-center">
+                        <span className="w-3.5 h-3.5 rounded-md bg-[#F97316] text-white flex items-center justify-center">
                           <Check className="w-2.5 h-2.5 stroke-[3]" />
                         </span>
                       ) : (
-                        <span className="w-3.5 h-3.5 rounded border border-slate-400 dark:border-slate-600 inline-block" />
+                        <span className="w-3.5 h-3.5 rounded-md border border-slate-400 dark:border-slate-600 inline-block" />
                       )}
                     </span>
                     <span className={it.checked ? 'line-through text-slate-400 dark:text-slate-500' : 'text-slate-700 dark:text-slate-200'}>
@@ -153,7 +163,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         return (
           <blockquote
             key={index}
-            className="my-3 pl-3.5 py-1 border-l-2 border-blue-500/80 bg-blue-500/5 dark:bg-blue-950/20 text-xs italic text-slate-600 dark:text-slate-300 rounded-r-md"
+            className="my-3 pl-3.5 py-1.5 border-l-2 border-[#F97316]/80 bg-orange-500/5 dark:bg-orange-950/20 text-xs italic text-slate-700 dark:text-slate-300 rounded-r-lg"
           >
             {renderInline(token.text)}
           </blockquote>
@@ -164,9 +174,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
         const header = token.header as Tokens.TableCell[]
         const rows = token.rows as Tokens.TableCell[][]
         return (
-          <div key={index} className="my-3 overflow-x-auto rounded-lg border border-slate-200 dark:border-[#23272F]">
-            <table className="w-full text-left text-xs border-collapse">
-              <thead className="bg-slate-100 dark:bg-[#15181F] text-slate-800 dark:text-slate-200 font-semibold border-b border-slate-200 dark:border-[#23272F]">
+          <div key={index} className="my-3 overflow-x-auto rounded-xl border border-[#E7E5E4] dark:border-[#2A2524]">
+            <table className="w-full text-left text-xs border-collapse font-body">
+              <thead className="bg-slate-50 dark:bg-[#191C21] text-slate-800 dark:text-slate-200 font-semibold border-b border-[#E7E5E4] dark:border-[#2A2524] font-mono">
                 <tr>
                   {header.map((cell, cIdx) => (
                     <th key={cIdx} className="px-3 py-2">
@@ -175,9 +185,9 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-slate-200/60 dark:divide-[#20242D]">
+              <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#2A2524]">
                 {rows.map((row, rIdx) => (
-                  <tr key={rIdx} className="hover:bg-slate-50 dark:hover:bg-[#1A1D24]/60">
+                  <tr key={rIdx} className="hover:bg-slate-50 dark:hover:bg-white/5">
                     {row.map((cell, cIdx) => (
                       <td key={cIdx} className="px-3 py-2 text-slate-700 dark:text-slate-300">
                         {renderInline(cell.text)}
@@ -192,7 +202,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
       }
 
       case 'hr': {
-        return <hr key={index} className="my-4 border-slate-200 dark:border-[#23272F]" />
+        return <hr key={index} className="my-4 border-[#E7E5E4] dark:border-[#2A2524]" />
       }
 
       case 'image': {
@@ -202,7 +212,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({
               src={token.href}
               alt={token.text || 'Diagram or preview'}
               onClick={() => onImageClick && onImageClick(token.href, token.text)}
-              className="max-h-96 rounded-lg border border-slate-200 dark:border-[#23272F] shadow-sm hover:ring-2 hover:ring-blue-500/50 cursor-pointer transition-all object-contain bg-white dark:bg-[#0A0C10]"
+              className="max-h-96 rounded-xl border border-[#E7E5E4] dark:border-[#2A2524] shadow-sm hover:ring-2 hover:ring-orange-500/50 cursor-pointer transition-all object-contain bg-white dark:bg-[#14161C]"
             />
             {token.text && (
               <span className="text-[11px] text-slate-500 dark:text-slate-400 mt-1 italic">

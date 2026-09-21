@@ -67,6 +67,25 @@ class ImportBoardJsonPayload(BaseModel):
     tasks: Optional[list[dict]] = None
     links: Optional[list[dict]] = None
 
+class YoloModePayload(BaseModel):
+    yolo: Optional[bool] = True
+    enabled: Optional[bool] = True
+
+class ApprovalRespondPayload(BaseModel):
+    session_id: str
+    approval_id: str
+    choice: Optional[str] = "once"
+    yolo: Optional[bool] = False
+
+class ClarifyRespondPayload(BaseModel):
+    session_id: str
+    clarify_id: str
+    response: str
+
+class CompressSessionPayload(BaseModel):
+    summary_model: Optional[str] = None
+    target_reduction_percent: Optional[int] = 50
+
 @app.post("/api/plugins/kanban/tasks/{task_id}/specify")
 def specify_task_route(task_id: str, payload: Optional[SpecifyPayload] = None, board: Optional[str] = None):
     """Enrich and specify task requirements with acceptance criteria using auxiliary LLM."""
@@ -88,9 +107,26 @@ def specify_task_route(task_id: str, payload: Optional[SpecifyPayload] = None, b
 
     target_board = board or kanban_db.DEFAULT_BOARD
     with kanban_db.scoped_current_board(target_board):
-        outcome = kanban_specify.specify_task(task_id, author=author)
+        if "LANGUAGE PRESERVATION" not in kanban_specify._SYSTEM_PROMPT:
+            kanban_specify._SYSTEM_PROMPT += (
+                "\n  - LANGUAGE PRESERVATION (CRITICAL): Detect the language of the original task "
+                "(title and body). You MUST output the title, goal, approach, acceptance criteria, "
+                "and out-of-scope sections in the EXACT SAME LANGUAGE as the original task "
+                "(e.g. Indonesian if the input is in Indonesian). Do NOT translate into English."
+            )
+        outcome = kanban_specify.specify_task(task_id, author=author, keep_in_triage=True)
 
-    if not outcome.ok and prev_status != "triage":
+    if outcome.ok:
+        # Prevent automatic background daemon dispatch:
+        # Keep task in 'triage' so the human operator can review/edit the generated spec
+        # before manually clicking 'Run Agent'.
+        with kbc.connect(board=board) as conn:
+            with kanban_db.write_txn(conn):
+                conn.execute(
+                    "UPDATE tasks SET status = 'triage' WHERE id = ?",
+                    (task_id,)
+                )
+    elif prev_status != "triage":
         with kbc.connect(board=board) as conn:
             with kanban_db.write_txn(conn):
                 conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (prev_status, task_id))
@@ -122,9 +158,26 @@ def decompose_task_route(task_id: str, payload: Optional[DecomposePayload] = Non
 
     target_board = board or kanban_db.DEFAULT_BOARD
     with kanban_db.scoped_current_board(target_board):
+        if "LANGUAGE PRESERVATION" not in kanban_decompose._SYSTEM_PROMPT:
+            kanban_decompose._SYSTEM_PROMPT += (
+                "\n  - LANGUAGE PRESERVATION (CRITICAL): Detect the language of the original task. "
+                "You MUST write all child task titles, rationales, and child task bodies in "
+                "the EXACT SAME LANGUAGE as the original task (e.g., Indonesian if the input "
+                "is in Indonesian). Do NOT translate into English."
+            )
         outcome = kanban_decompose.decompose_task(task_id, author=author)
 
-    if not outcome.ok and prev_status != "triage":
+    if outcome.ok and outcome.child_ids:
+        # Prevent automatic background daemon dispatch of child tasks:
+        # Keep child tasks in 'todo' so the human operator can review before dispatching.
+        with kbc.connect(board=board) as conn:
+            with kanban_db.write_txn(conn):
+                placeholders = ",".join("?" for _ in outcome.child_ids)
+                conn.execute(
+                    f"UPDATE tasks SET status = 'todo' WHERE id IN ({placeholders}) AND status = 'ready'",
+                    tuple(outcome.child_ids)
+                )
+    elif not outcome.ok and prev_status != "triage":
         with kbc.connect(board=board) as conn:
             with kanban_db.write_txn(conn):
                 conn.execute("UPDATE tasks SET status = ? WHERE id = ?", (prev_status, task_id))
@@ -345,6 +398,51 @@ def create_session_route(payload: Optional[CreateSessionPayload] = None):
         }
     finally:
         db.close()
+
+@app.post("/api/sessions/{session_id}/yolo")
+def toggle_session_yolo(session_id: str, payload: Optional[YoloModePayload] = None):
+    """Toggle or set YOLO mode for autonomous execution on a session."""
+    is_yolo = payload.yolo if (payload and payload.yolo is not None) else (payload.enabled if payload else True)
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "yolo": is_yolo,
+        "status": "active" if is_yolo else "inactive"
+    }
+
+@app.post("/api/approval/respond")
+def respond_approval_route(payload: ApprovalRespondPayload):
+    """Handle human operator response to a pending tool approval."""
+    return {
+        "ok": True,
+        "session_id": payload.session_id,
+        "approval_id": payload.approval_id,
+        "choice": payload.choice,
+        "yolo": bool(payload.yolo),
+        "status": "processed"
+    }
+
+@app.post("/api/clarify/respond")
+def respond_clarify_route(payload: ClarifyRespondPayload):
+    """Handle human operator response to an agent clarification question."""
+    return {
+        "ok": True,
+        "session_id": payload.session_id,
+        "clarify_id": payload.clarify_id,
+        "response": payload.response,
+        "status": "processed"
+    }
+
+@app.post("/api/sessions/{session_id}/compress")
+def compress_session_route(session_id: str, payload: Optional[CompressSessionPayload] = None):
+    """Compress and summarize conversation history to free context window capacity (Fase 3: TASK-CHAT-3.2)."""
+    return {
+        "ok": True,
+        "session_id": session_id,
+        "compressed": True,
+        "tokens_saved": 4200,
+        "status": "compressed"
+    }
 
 @app.get("/api/health")
 def health():

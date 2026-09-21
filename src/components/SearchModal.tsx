@@ -50,13 +50,18 @@ export const SearchModal: React.FC<SearchModalProps> = ({
     const out: SearchResult[] = []
 
     tasks
-      .filter(t => t.title.toLowerCase().includes(q) || t.id.toLowerCase().includes(q))
+      .filter(
+        t =>
+          t.title.toLowerCase().includes(q) ||
+          t.id.toLowerCase().includes(q) ||
+          (t.displayId && t.displayId.toLowerCase().includes(q))
+      )
       .slice(0, 6)
       .forEach(t =>
         out.push({
           key: `task-${t.id}`,
           label: t.title,
-          sublabel: `${t.id} · ${t.projectName}`,
+          sublabel: `${t.displayId || t.id} · ${t.projectName}`,
           icon: <CheckSquare className="w-3.5 h-3.5 text-slate-400" />,
           tab: 'issues'
         })
@@ -135,16 +140,16 @@ export const SearchModal: React.FC<SearchModalProps> = ({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 backdrop-blur-xs p-4 pt-[12vh]"
+      className="fixed inset-0 z-50 flex items-start justify-center bg-black/70 backdrop-blur-xs p-4 pt-[12vh] font-body"
       onClick={onClose}
     >
       <div
-        className="w-full max-w-xl rounded-xl border border-slate-200 dark:border-[#282D37] bg-white dark:bg-[#16191E] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
+        className="w-full max-w-xl rounded-2xl border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-100"
         onClick={e => e.stopPropagation()}
       >
         {/* Search input */}
-        <div className="flex items-center gap-2.5 px-4 py-3 border-b border-slate-200 dark:border-[#23272F]">
-          <Search className="w-4 h-4 text-slate-400" />
+        <div className="flex items-center gap-2.5 px-4 py-3.5 border-b border-[#E7E5E4] dark:border-[#2A2524]">
+          <Search className="w-4 h-4 text-[#F97316]" />
           <input
             ref={inputRef}
             value={query}
@@ -153,7 +158,7 @@ export const SearchModal: React.FC<SearchModalProps> = ({
             placeholder="Search issues, projects, agents, skills..."
             className="flex-1 bg-transparent text-sm text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none"
           />
-          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-slate-200/60 dark:bg-slate-800 font-mono text-slate-500">
+          <kbd className="text-[10px] px-1.5 py-0.5 rounded bg-slate-100 dark:bg-[#2A2524] font-mono text-slate-500">
             Esc
           </kbd>
         </div>
@@ -161,11 +166,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({
         {/* Results */}
         <div className="max-h-80 overflow-y-auto py-1">
           {query.trim() === '' ? (
-            <div className="px-4 py-6 text-center text-xs text-slate-400">
+            <div className="px-4 py-6 text-center text-xs text-slate-400 font-body">
               Type to search across your workspace
             </div>
           ) : results.length === 0 ? (
-            <div className="px-4 py-6 text-center text-xs text-slate-400">
+            <div className="px-4 py-6 text-center text-xs text-slate-400 font-body">
               No results for “{query}”
             </div>
           ) : (
@@ -174,10 +179,10 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                 key={r.key}
                 onClick={() => choose(r)}
                 onMouseEnter={() => setActiveIndex(idx)}
-                className={`w-full flex items-center gap-2.5 px-4 py-2 text-left transition-colors ${
+                className={`w-full flex items-center gap-2.5 px-4 py-2.5 text-left transition-colors cursor-pointer ${
                   idx === activeIndex
-                    ? 'bg-blue-50 dark:bg-blue-950/40'
-                    : 'hover:bg-slate-50 dark:hover:bg-slate-800/40'
+                    ? 'bg-orange-500/10 dark:bg-orange-950/30 border-l-2 border-[#F97316]'
+                    : 'hover:bg-black/5 dark:hover:bg-white/5 border-l-2 border-transparent'
                 }`}
               >
                 <span className="shrink-0">{r.icon}</span>
@@ -186,11 +191,11 @@ export const SearchModal: React.FC<SearchModalProps> = ({
                     {r.label}
                   </div>
                   {r.sublabel && (
-                    <div className="text-[11px] text-slate-400 truncate">{r.sublabel}</div>
+                    <div className="text-[11px] text-slate-400 truncate font-mono">{r.sublabel}</div>
                   )}
                 </div>
                 {idx === activeIndex && (
-                  <CornerDownLeft className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                  <CornerDownLeft className="w-3.5 h-3.5 text-[#F97316] shrink-0" />
                 )}
               </button>
             ))

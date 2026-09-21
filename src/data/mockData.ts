@@ -17,7 +17,7 @@ export const initialTasks: Task[] = [
 [17/09, 10:41] Sigit: Aku cek dulu ya mas
 
 Bantu saya cek routing static di vpc kpc bukan yang kimper,`,
-    status: 'in_review',
+    status: 'review',
     priority: 'medium',
     assigneeType: 'agent',
     assigneeName: 'AWS Cloud Operations',
@@ -45,13 +45,16 @@ Bantu saya cek routing static di vpc kpc bukan yang kimper,`,
         uploaded_by: 'sa-aws',
         created_at: Math.floor(Date.now() / 1000) - 86000
       }
+    ],
+    diagnostics: [
+      { kind: 'stale_worker', severity: 'warning', message: 'Worker claim heartbeat has not been updated in 5 minutes.' }
     ]
   },
   {
     id: 'DIK-35',
     title: '[Email] Jadwal & Persiapan Sharing Knowledge Arsitektur...',
     description: 'Koordinasi jadwal internal session migrasi multi-account AWS.',
-    status: 'in_review',
+    status: 'review',
     priority: 'high',
     assigneeType: 'agent',
     assigneeName: 'Outlook Email Agent',
@@ -170,7 +173,7 @@ export const initialProjects: Project[] = [
     priority: 'none',
     progressDone: 1,
     progressTotal: 1,
-    lead: 'Muhammad Sigit',
+    lead: 'Workspace Owner',
     leadAvatar: '👤',
     createdAt: '4d ago',
     description: 'Managed Services KPC Cloud Account. Shared with agents as context for every run in this project.'
@@ -208,7 +211,7 @@ export const initialAgents: AIAgent[] = [
     name: 'Outlook Email Agent',
     description: 'Menganalisa dan mengkategorikan email Outlook masuk.',
     status: 'online',
-    owner: 'Muhammad Sigit',
+    owner: 'Workspace Owner',
     access: 'Owner only',
     runtime: 'Claude (DCS-LAN-9router)',
     lastActive: 'Today',
@@ -219,7 +222,7 @@ export const initialAgents: AIAgent[] = [
     name: 'AWS Solution Architect',
     description: 'Senior AWS Solutions Architect untuk desain arsitektur.',
     status: 'online',
-    owner: 'Muhammad Sigit',
+    owner: 'Workspace Owner',
     access: 'Workspace',
     runtime: 'Claude (DCS-LAN-9router)',
     lastActive: '1 day ago',
@@ -230,7 +233,7 @@ export const initialAgents: AIAgent[] = [
     name: 'AWS Team Lead',
     description: 'Orchestrator dan Squad Lead untuk AWS Cloud Operations.',
     status: 'online',
-    owner: 'Muhammad Sigit',
+    owner: 'Workspace Owner',
     access: 'Workspace',
     runtime: 'Claude (DCS-LAN-9router)',
     lastActive: '2 days ago',
@@ -241,7 +244,7 @@ export const initialAgents: AIAgent[] = [
     name: 'KPC Cloud - Ops',
     description: 'Dedicated AWS Cloud Operations untuk klien KPC.',
     status: 'online',
-    owner: 'Muhammad Sigit',
+    owner: 'Workspace Owner',
     access: 'Workspace',
     runtime: 'Claude (DCS-LAN-9router)',
     lastActive: '2 days ago',
@@ -252,7 +255,7 @@ export const initialAgents: AIAgent[] = [
     name: 'TLI - AWS Engineer',
     description: 'Dedicated AWS Cloud Engineer untuk TLI.',
     status: 'online',
-    owner: 'Muhammad Sigit',
+    owner: 'Workspace Owner',
     access: 'Workspace',
     runtime: 'Claude (DCS-LAN-9router)',
     lastActive: '2 days ago',
@@ -269,20 +272,20 @@ export const initialSquads: Squad[] = [
     leaderAvatar: '👑',
     memberCount: 8,
     members: ['AWS Solution Architect', 'KPC Cloud - Ops', 'TLI - AWS Engineer', 'Outlook Email Agent'],
-    createdBy: 'Muhammad Sigit'
+    createdBy: 'Workspace Owner'
   }
 ]
 
 export const initialSkills: Skill[] = [
-  { id: 'sk-1', name: 'aws-architecture-diagram', usedBy: 'AWS Team Lead', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-2', name: 'aws-cloudformation', usedBy: 'AWS Solution Architect', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-3', name: 'aws-cdk', usedBy: 'AWS Solution Architect', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-4', name: 'aws-containers', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-5', name: 'aws-serverless', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-6', name: 'aws-billing-and-cost-management', usedBy: '+8 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-7', name: 'aws-observability', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-8', name: 'aws-security', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-9', name: 'aws-iam', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-10', name: 'aws-database', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' },
-  { id: 'sk-11', name: 'aws-storage', usedBy: '+7 agents', addedBy: 'Muhammad Sigit', updatedAt: '5d ago' }
+  { id: 'sk-1', name: 'aws-architecture-diagram', usedBy: 'AWS Team Lead', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-2', name: 'aws-cloudformation', usedBy: 'AWS Solution Architect', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-3', name: 'aws-cdk', usedBy: 'AWS Solution Architect', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-4', name: 'aws-containers', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-5', name: 'aws-serverless', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-6', name: 'aws-billing-and-cost-management', usedBy: '+8 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-7', name: 'aws-observability', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-8', name: 'aws-security', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-9', name: 'aws-iam', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-10', name: 'aws-database', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' },
+  { id: 'sk-11', name: 'aws-storage', usedBy: '+7 agents', addedBy: 'Workspace Owner', updatedAt: '5d ago' }
 ]

@@ -40,21 +40,24 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
   }
 
   return (
-    <div className="flex-1 flex flex-col h-[calc(100vh-3rem)] overflow-hidden bg-white dark:bg-[#0D0F12]">
+    <div className="flex-1 flex flex-col h-[calc(100vh-3rem)] overflow-hidden bg-[#FAF9F9] dark:bg-[#0F1115] font-body">
       {/* Header */}
-      <div className="p-4 border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between">
+      <div className="p-4 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between bg-white dark:bg-[#14161C]">
         <div className="flex items-center gap-3">
-          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-            <Zap className="w-4 h-4 text-amber-500" />
+          <h2 className="text-sm font-semibold text-slate-900 dark:text-white flex items-center gap-2 font-display">
+            <Zap className="w-4 h-4 text-[#F97316]" />
             Autopilot
-            <span className="text-xs font-normal text-slate-400">({autopilots.length})</span>
+            <span className="text-xs font-normal text-slate-400 font-mono">({autopilots.length})</span>
           </h2>
           <span className="text-xs text-slate-500">
             Automated schedulers powered by Hermes Cron engine
           </span>
         </div>
 
-        <button onClick={onNewAutopilot} className="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium bg-amber-600 hover:bg-amber-700 text-white transition-colors shadow-xs">
+        <button
+          onClick={onNewAutopilot}
+          className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white transition-all shadow-xs shadow-orange-500/20 active:scale-95 cursor-pointer"
+        >
           <Plus className="w-3.5 h-3.5" />
           <span>New autopilot</span>
         </button>
@@ -64,7 +67,7 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
       <div className="flex-1 overflow-y-auto">
         <table className="w-full text-left text-xs border-collapse">
           <thead>
-            <tr className="border-b border-slate-200 dark:border-[#23272F] bg-slate-50 dark:bg-[#14171D] text-slate-500">
+            <tr className="border-b border-[#E7E5E4] dark:border-[#2A2524] bg-slate-50 dark:bg-[#191C21] text-slate-500 font-mono text-[11px] uppercase">
               <th className="py-2.5 px-4 font-medium">Name</th>
               <th className="py-2.5 px-4 font-medium">Assignee</th>
               <th className="py-2.5 px-4 font-medium">Trigger</th>
@@ -73,14 +76,14 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
               <th className="py-2.5 px-4 font-medium">Action</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-slate-200/80 dark:divide-[#1F232B]">
+          <tbody className="divide-y divide-[#E7E5E4] dark:divide-[#2A2524]">
             {autopilots.map(job => (
               <tr
                 key={job.id}
-                className="hover:bg-slate-50 dark:hover:bg-[#16191E] transition-colors"
+                className="hover:bg-black/5 dark:hover:bg-white/5 transition-colors"
               >
-                <td className="py-3 px-4 font-medium text-slate-900 dark:text-white flex items-center gap-2">
-                  <span className="text-amber-500">⚡</span>
+                <td className="py-3 px-4 font-medium text-slate-900 dark:text-white flex items-center gap-2 font-display">
+                  <span className="text-[#F97316]">⚡</span>
                   <span>{job.name}</span>
                 </td>
                 <td className="py-3 px-4 text-slate-700 dark:text-slate-300">
@@ -108,10 +111,10 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
                       onClick={() => handleToggle(job)}
                       disabled={togglingId === job.id}
                       title={job.status === 'active' ? 'Pause schedule' : 'Resume schedule'}
-                      className={`px-2 py-1 rounded flex items-center gap-1 text-[11px] disabled:opacity-50 ${
+                      className={`px-2.5 py-1 rounded-lg flex items-center gap-1 text-[11px] font-medium disabled:opacity-50 cursor-pointer transition-colors ${
                         job.status === 'active'
-                          ? 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 hover:bg-amber-100 dark:hover:bg-amber-900/40'
-                          : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40'
+                          ? 'bg-orange-50 dark:bg-orange-950/40 text-orange-600 dark:text-[#FB923C] hover:bg-orange-100 dark:hover:bg-orange-900/40 border border-orange-500/20'
+                          : 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 dark:hover:bg-emerald-900/40 border border-emerald-500/20'
                       }`}
                     >
                       {togglingId === job.id ? (
@@ -128,7 +131,7 @@ export const AutopilotView: React.FC<AutopilotViewProps> = ({
                     <button
                       onClick={() => handleRun(job.id)}
                       disabled={runningId === job.id}
-                      className="px-2 py-1 rounded bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 flex items-center gap-1 text-[11px] disabled:opacity-50"
+                      className="px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-[#191C21] hover:bg-slate-200 dark:hover:bg-[#2A2524] text-slate-700 dark:text-slate-300 border border-[#E7E5E4] dark:border-[#2A2524] flex items-center gap-1 text-[11px] font-medium disabled:opacity-50 cursor-pointer transition-colors"
                     >
                       {runningId === job.id ? (
                         <Loader2 className="w-2.5 h-2.5 animate-spin" />

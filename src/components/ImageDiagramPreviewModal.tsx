@@ -114,20 +114,20 @@ export const ImageDiagramPreviewModal: React.FC<ImageDiagramPreviewModalProps> =
         if (e.target === e.currentTarget) onClose()
       }}
     >
-      <div className="w-full max-w-5xl h-[88vh] flex flex-col rounded-2xl border border-slate-700/80 bg-[#12151B] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150">
+      <div className="w-full max-w-5xl h-[88vh] flex flex-col rounded-2xl border border-[#E7E5E4] dark:border-[#2A2524] bg-white dark:bg-[#191C21] shadow-2xl overflow-hidden animate-in zoom-in-95 duration-150 font-body">
         {/* Top Header Controls */}
-        <div className="px-4 py-3 border-b border-[#23272F] flex items-center justify-between bg-[#161920] select-none">
+        <div className="px-4 py-3 border-b border-[#E7E5E4] dark:border-[#2A2524] flex items-center justify-between bg-slate-50 dark:bg-[#14161C] select-none">
           <div className="flex items-center gap-2.5 overflow-hidden">
-            <div className="p-1.5 rounded-lg bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+            <div className="p-1.5 rounded-lg bg-orange-500/10 text-[#F97316] border border-orange-500/20">
               <FileImage className="w-4 h-4" />
             </div>
             <div className="overflow-hidden">
               <div className="flex items-center gap-2">
-                <h3 className="font-semibold text-xs text-white truncate max-w-md" title={title}>
+                <h3 className="font-semibold text-xs text-slate-900 dark:text-white truncate max-w-md font-display" title={title}>
                   {title}
                 </h3>
                 {isSvg && (
-                  <span className="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-300 text-[10px] font-mono font-bold border border-emerald-500/30">
+                  <span className="px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600 dark:text-emerald-300 text-[10px] font-mono font-bold border border-emerald-500/30">
                     VECTOR SVG
                   </span>
                 )}
@@ -141,41 +141,41 @@ export const ImageDiagramPreviewModal: React.FC<ImageDiagramPreviewModalProps> =
           </div>
 
           {/* Center Toolbar: Zoom, Contrast, Reset */}
-          <div className="flex items-center gap-1.5 bg-[#0E1116] border border-[#23272F] p-1 rounded-xl shadow-xs">
+          <div className="flex items-center gap-1.5 bg-white dark:bg-[#0E1116] border border-[#E7E5E4] dark:border-[#23272F] p-1 rounded-xl shadow-xs">
             <button
               onClick={handleZoomOut}
               disabled={zoom <= 25}
-              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 cursor-pointer transition-colors"
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer transition-colors"
               title="Zoom Out (-)"
             >
               <ZoomOut className="w-3.5 h-3.5" />
             </button>
 
-            <span className="text-[11px] font-mono font-semibold text-slate-200 px-2 min-w-[50px] text-center select-none">
+            <span className="text-[11px] font-mono font-semibold text-slate-800 dark:text-slate-200 px-2 min-w-[50px] text-center select-none">
               {zoom}%
             </span>
 
             <button
               onClick={handleZoomIn}
               disabled={zoom >= 400}
-              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 disabled:opacity-40 cursor-pointer transition-colors"
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-40 cursor-pointer transition-colors"
               title="Zoom In (+)"
             >
               <ZoomIn className="w-3.5 h-3.5" />
             </button>
 
-            <div className="h-4 w-px bg-slate-800 mx-0.5" />
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 mx-0.5" />
 
             <button
               onClick={handleResetZoom}
-              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
               title="Reset Zoom (0)"
             >
               <RotateCcw className="w-3 h-3" />
               <span>Fit</span>
             </button>
 
-            <div className="h-4 w-px bg-slate-800 mx-0.5" />
+            <div className="h-4 w-px bg-slate-200 dark:bg-slate-800 mx-0.5" />
 
             {/* Contrast Mode for transparent SVGs */}
             <button
@@ -184,15 +184,15 @@ export const ImageDiagramPreviewModal: React.FC<ImageDiagramPreviewModalProps> =
                 else if (contrastMode === 'light') setContrastMode('checkered')
                 else setContrastMode('dark')
               }}
-              className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+              className="p-1.5 rounded-lg text-slate-500 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
               title={`Background Canvas: ${contrastMode.toUpperCase()}`}
             >
               {contrastMode === 'dark' ? (
-                <Moon className="w-3.5 h-3.5 text-blue-400" />
+                <Moon className="w-3.5 h-3.5 text-[#FB923C]" />
               ) : contrastMode === 'light' ? (
-                <Sun className="w-3.5 h-3.5 text-amber-400" />
+                <Sun className="w-3.5 h-3.5 text-[#F97316]" />
               ) : (
-                <div className="w-3.5 h-3.5 border border-slate-500 bg-[linear-gradient(45deg,#333_25%,transparent_25%),linear-gradient(-45deg,#333_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#333_75%),linear-gradient(-45deg,transparent_75%,#333_75%)] bg-[size:6px_6px] rounded-xs" />
+                <div className="w-3.5 h-3.5 border border-slate-500 bg-[linear-gradient(45deg,#888_25%,transparent_25%),linear-gradient(-45deg,#888_25%,transparent_25%),linear-gradient(45deg,transparent_75%,#888_75%),linear-gradient(-45deg,transparent_75%,#888_75%)] bg-[size:6px_6px] rounded-xs" />
               )}
             </button>
           </div>
@@ -203,7 +203,7 @@ export const ImageDiagramPreviewModal: React.FC<ImageDiagramPreviewModalProps> =
               <a
                 href={downloadUrl}
                 download={title}
-                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-[#1E232E] hover:bg-[#282F3E] text-slate-200 hover:text-white border border-[#2D3443] transition-colors cursor-pointer"
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-[#F97316] hover:bg-[#FB923C] text-white transition-colors cursor-pointer shadow-xs"
                 title="Download architecture file"
               >
                 <Download className="w-3.5 h-3.5" />
@@ -213,7 +213,7 @@ export const ImageDiagramPreviewModal: React.FC<ImageDiagramPreviewModalProps> =
 
             <button
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 cursor-pointer transition-colors"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-black/5 dark:hover:bg-slate-800 cursor-pointer transition-colors"
               title="Close (Esc)"
             >
               <X className="w-4 h-4" />
