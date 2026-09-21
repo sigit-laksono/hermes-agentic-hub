@@ -8,7 +8,7 @@
 export const API_BASE =
   (typeof import.meta !== 'undefined' && import.meta.env?.VITE_HERMES_API_URL) ||
   (typeof process !== 'undefined' && (process.env?.VITE_HERMES_API_URL || process.env?.HERMES_API_URL)) ||
-  ''
+  (typeof window === 'undefined' ? 'http://127.0.0.1:9120' : '')
 
 // "45s" / "12m" / "3h 20m" — used for the oldest-ready age badge (stuck-dispatcher signal).
 export function formatAge(seconds: number): string {

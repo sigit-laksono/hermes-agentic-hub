@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test:smoke": "npx tsx tests/runtime_api_smoke_test.ts"
   },
   "dependencies": {
     "@types/prismjs": "^1.26.6",
