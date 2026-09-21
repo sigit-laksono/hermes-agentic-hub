@@ -2,12 +2,15 @@
 /**
  * Hermes Agent Live API Client
  * Communicates with the local Hermes harness bridge (http://127.0.0.1:9120)
+ *
+ * NOTE: Domain modules are being extracted incrementally (v0.1.1.2).
+ * Extracted domains delegate through this facade for backward compatibility.
+ *   - autopilot/ (cron jobs) — extracted in TASK-1.1
  */
 
 import {
   TaskStatus,
   AIAgent,
-  AutopilotJob,
   Skill,
   Squad,
   TaskAttachment,
@@ -31,6 +34,18 @@ import {
   PendingApproval,
   PendingClarify
 } from '../types'
+
+// ── Extracted domain modules (delegated for backward compat) ─────────────
+import {
+  getCronJobs,
+  getCronJobHistory,
+  triggerCronJob,
+  pauseCronJob,
+  resumeCronJob,
+  createCronJob,
+  updateCronJob,
+  deleteCronJob,
+} from './autopilot/cron.api'
 
 export interface ChatSocketHandlers {
   onReady?: () => void
@@ -64,24 +79,8 @@ export interface ChatSocketController {
   respondClarify?: (clarifyId: string, response: string) => void | Promise<any>
 }
 
-const API_BASE =
-  (typeof import.meta !== 'undefined' && import.meta.env?.VITE_HERMES_API_URL) ||
-  (typeof process !== 'undefined' && (process.env?.VITE_HERMES_API_URL || process.env?.HERMES_API_URL)) ||
-  ''
-
-// "45s" / "12m" / "3h 20m" — used for the oldest-ready age badge (stuck-dispatcher signal).
-function formatAge(seconds: number): string {
-  if (!Number.isFinite(seconds) || seconds < 0) return '0s'
-  if (seconds < 60) return `${Math.floor(seconds)}s`
-  const mins = Math.floor(seconds / 60)
-  if (mins < 60) return `${mins}m`
-  const hours = Math.floor(mins / 60)
-  const remMins = mins % 60
-  if (hours < 24) return remMins > 0 ? `${hours}h ${remMins}m` : `${hours}h`
-  const days = Math.floor(hours / 24)
-  const remHours = hours % 24
-  return remHours > 0 ? `${days}d ${remHours}h` : `${days}d`
-}
+// ── Shared utilities ─────────────────────────────────────────────────────
+import { API_BASE, formatAge } from './client'
 
 export const hermesApi = {
   // Check health
@@ -1107,143 +1106,15 @@ export const hermesApi = {
   },
 
   // 3. Autopilot (Hermes Cron Jobs)
-  async getCronJobs(): Promise<AutopilotJob[]> {
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs`)
-      if (!res.ok) return []
-      const jobs = await res.json()
-
-      return jobs.map((j: any) => ({
-        id: j.id,
-        name: j.name,
-        assignee: j.profile || 'default',
-        assigneeAvatar: j.profile?.includes('aws') ? '⚡' : '🤖',
-        trigger: `Schedule (${j.schedule_display || j.schedule?.display || 'cron'})`,
-        lastRun: j.last_run_at ? new Date(j.last_run_at).toLocaleTimeString() : 'Never',
-        nextRun: j.next_run_at ? new Date(j.next_run_at).toLocaleString() : '-',
-        status: j.enabled ? 'active' : 'paused'
-      }))
-    } catch {
-      return []
-    }
-  },
-
-  // Trigger a cron job to run immediately. The backend runs the job which may take a
-  // while, so we fire the request with a short client timeout and treat a timeout as
-  // "accepted" (the run continues server-side; the live poll will reflect last_run).
-  async triggerCronJob(jobId: string): Promise<boolean> {
-    const controller = new AbortController()
-    const timeout = setTimeout(() => controller.abort(), 4000)
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}/trigger`, {
-        method: 'POST',
-        signal: controller.signal
-      })
-      return res.ok
-    } catch (err) {
-      // AbortError => request still processing server-side; consider it accepted.
-      if (err instanceof DOMException && err.name === 'AbortError') return true
-      return false
-    } finally {
-      clearTimeout(timeout)
-    }
-  },
-
-  async pauseCronJob(jobId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}/pause`, { method: 'POST' })
-      return res.ok
-    } catch {
-      return false
-    }
-  },
-
-  async resumeCronJob(jobId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}/resume`, { method: 'POST' })
-      return res.ok
-    } catch {
-      return false
-    }
-  },
-
-  // Create a new cron (autopilot) job. schedule is a cron expression string.
-  async createCronJob(params: {
-    name: string
-    schedule: string
-    prompt: string
-    profile?: string
-  }): Promise<boolean> {
-    try {
-      const query = params.profile ? `?profile=${encodeURIComponent(params.profile)}` : ''
-      const res = await fetch(`${API_BASE}/api/cron/jobs${query}`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: params.name,
-          schedule: params.schedule,
-          prompt: params.prompt,
-          deliver: 'local'
-        })
-      })
-      return res.ok
-    } catch {
-      return false
-    }
-  },
-
-  // TASK-1.1: Update an existing cron job
-  async updateCronJob(jobId: string, params: {
-    name?: string
-    schedule?: string
-    prompt?: string
-    profile?: string
-    enabled?: boolean
-  }): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(params)
-      })
-      return res.ok
-    } catch {
-      return false
-    }
-  },
-
-  // TASK-1.1: Delete a cron job
-  async deleteCronJob(jobId: string): Promise<boolean> {
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}`, {
-        method: 'DELETE'
-      })
-      return res.ok
-    } catch {
-      return false
-    }
-  },
-
-  // TASK-1.2: Get cron job execution history
-  async getCronJobHistory(jobId: string): Promise<{
-    runs: Array<{
-      id: string
-      started_at: number
-      ended_at?: number
-      status: 'success' | 'failed' | 'running'
-      duration_seconds?: number
-      summary?: string
-      error?: string
-    }>
-  }> {
-    try {
-      const res = await fetch(`${API_BASE}/api/cron/jobs/${jobId}/history`)
-      if (!res.ok) return { runs: [] }
-      return res.json()
-    } catch {
-      return { runs: [] }
-    }
-  },
+  // ── Delegated to src/api/autopilot/cron.api.ts (v0.1.1.2 TASK-1.1) ──
+  getCronJobs,
+  triggerCronJob,
+  pauseCronJob,
+  resumeCronJob,
+  createCronJob,
+  updateCronJob,
+  deleteCronJob,
+  getCronJobHistory,
 
   // 4. Skills Catalog
   async getSkills(): Promise<Skill[]> {

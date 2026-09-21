@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { X, Clock, CheckCircle2, XCircle, Loader2, History } from 'lucide-react'
-import { hermesApi } from '../api/hermesApi'
+import { getCronJobHistory } from '../api/autopilot/cron.api'
 
 interface CronHistoryDrawerProps {
   jobId: string | null
@@ -28,7 +28,7 @@ export const CronHistoryDrawer: React.FC<CronHistoryDrawerProps> = ({ jobId, job
     const fetchHistory = async () => {
       setLoading(true)
       try {
-        const data = await hermesApi.getCronJobHistory(jobId)
+        const data = await getCronJobHistory(jobId)
         setRuns(data.runs || [])
       } finally {
         setLoading(false)
