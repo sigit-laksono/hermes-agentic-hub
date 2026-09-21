@@ -56,7 +56,7 @@ doc/planning/
 | Versi | Fokus Utama | Asal Perencanaan | Jumlah Task | Status | Dokumen Terkait |
 |:---:|---|---|:---:|:---:|---|
 | **`v0.1.1`** | **Autopilot, Skills & Profile Fleet Lifecycle**<br>• Edit & Delete Cron Job, Riwayat Run<br>• In-App Skill Authoring (`SKILL.md`) & Toggle<br>• Profile Delete, Export, Import & Auto-Describe | Gap Analysis Fase 3 | 6 Tasks | `[✅] Completed` | [PRD](./0.1.1/PRD.md) • [TASK](./0.1.1/TASK.md) • [REPORT](./0.1.1/COMPLETION_REPORT.md) |
-| **`v0.1.1.2`** | **🔥 Codebase Refactoring & Architecture Improvement**<br>• Split `hermesApi.ts` (2,671 lines) by domain<br>• Extract Custom Hooks from `App.tsx` (1,393 lines)<br>• Split `types.ts` by domain<br>• Zero breaking changes, backward compatible | Technical Debt Reduction | 11 Tasks | `[ ] Planned` | [PRD](./0.1.1.2/PRD.md) • [TASK](./0.1.1.2/TASK.md) • [README](./0.1.1.2/README.md) |
+| **`v0.1.1.2`** | **🔥 Codebase Refactoring & Architecture Improvement**<br>• Split `hermesApi.ts` (2,671 lines) by domain<br>• Extract Custom Hooks from `App.tsx` (1,393 lines)<br>• Split `types.ts` by domain<br>• Zero breaking changes, backward compatible | Technical Debt Reduction | 11 Tasks | `[✅] Completed` | [PRD](./0.1.1.2/PRD.md) • [TASK](./0.1.1.2/TASK.md) • [REPORT](./0.1.1.2/COMPLETION_REPORT.md) |
 | **`v0.1.2`** | **Settings Hub & Full System Configuration**<br>• Layout Navigasi Sub-Menu Settings<br>• Config.yaml & Masked .env Editor<br>• Gateway Daemon Controller & API Key Pool<br>• Memory Inspector & Hermes Doctor Audit | Gap Analysis Fase 4 | 6 Tasks | `[ ] Planned` | [PRD](./0.1.2/PRD.md) • [TASK](./0.1.2/TASK.md) |
 | **`v0.1.3`** | **Native Projects & Git Worktrees Execution**<br>• First-Class `projects.db` & Local Repo Picker<br>• Task Binding ke `project_id`<br>• Automated Git Worktrees (`.worktrees/<task-id>`)<br>• Visual Git Diff & Review di Inbox | Proposal Pilar 1 + Gap Analysis Fase 5 | 5 Tasks | `[ ] Planned` | [PRD](./0.1.3/PRD.md) • [TASK](./0.1.3/TASK.md) |
 | **`v0.1.4`** | **Bot Mode, Direct Messaging & Task Sessions**<br>• Canonical Bot Chat per profil (`ui_meta`)<br>• Bot-to-Bot via `message_agent` Tool Call<br>• Autocomplete `@mention` Roster di Chat<br>• Task-to-Session Interactive Bridge di Drawer | Proposal Pilar 2 & 3 | 5 Tasks | `[ ] Planned` | [PRD](./0.1.4/PRD.md) • [TASK](./0.1.4/TASK.md) |
@@ -68,8 +68,8 @@ doc/planning/
 ## 🎯 Panduan Urutan Eksekusi
 
 1. **✅ `0.1.1` (COMPLETED):** Fungsionalitas inti armada agen dan autopilot selesai.
-2. **🔥 `0.1.1.2` (CRITICAL - NEXT):** **Technical debt reduction** - Refactor codebase sebelum menambah fitur baru untuk maintainability jangka panjang.
-3. **Lanjut ke `0.1.2`:** Membuka akses kontrol sistem dan variabel environment via Web Settings.
+2. **✅ `0.1.1.2` (COMPLETED):** **Technical debt reduction** - Refactor codebase (hermesApi.ts, App.tsx, types.ts) sukses diselesaikan dengan arsitektur domain-driven & modular hooks.
+3. **🔥 Lanjut ke `0.1.2` (NEXT):** Membuka akses kontrol sistem dan variabel environment via Web Settings.
 4. **Lanjut ke `0.1.3`:** Membawa isolasi Git worktree riil ke seluruh pengerjaan tugas proyek.
 5. **Lanjut ke `0.1.4`:** Menghidupkan kolaborasi Bot-to-Bot dan intervensi live session.
 6. **Lanjut ke `0.1.5`:** Menambahkan ruang brainstorming tim dan katalog integrasi MCP.
