@@ -64,7 +64,11 @@ async function runTests() {
     'getSquads', 'connectEvents',
     'getSessions', 'createSession', 'deleteSession', 'renameSession',
     'getSessionMessages', 'cancelChatTurn', 'respondApproval', 'setSessionYolo',
-    'respondClarify', 'compressSession', 'connectChatStream', 'connectChatWS', 'connectChat'
+    'respondClarify', 'compressSession', 'connectChatStream', 'connectChatWS', 'connectChat',
+    // v0.1.2 Settings & System Configuration
+    'getConfig', 'getConfigSchema', 'getConfigDefaults', 'updateConfig',
+    'getEnvVars', 'updateEnvVar', 'deleteEnvVar', 'revealEnvVar',
+    'getSystemStatus', 'getSystemStats', 'getMessagingPlatforms', 'getCustomEndpoints'
   ]
 
   let allMethodsPresent = true

@@ -12,5 +12,6 @@ export * from './boards'
 export * from './orchestration'
 export * from './autopilot'
 export * from './chat'
+export * from './settings'
 
 export { hermesApi } from './hermesApi'

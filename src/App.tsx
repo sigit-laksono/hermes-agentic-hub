@@ -9,6 +9,7 @@ import { ProjectsView } from './components/ProjectsView'
 import { AutopilotView } from './components/AutopilotView'
 import { AgentsView, SquadsView, SkillsView } from './components/AITeamViews'
 import { ChatView } from './components/ChatView'
+import { SettingsView } from './components/SettingsView'
 import { NewIssueModal } from './components/NewIssueModal'
 import { SearchModal } from './components/SearchModal'
 import { NewAutopilotModal } from './components/NewAutopilotModal'
@@ -360,17 +361,7 @@ export const AppContent: React.FC = () => {
           )}
 
           {activeTab === 'settings' && (
-            <div className="flex-1 flex flex-col items-center justify-center p-8 text-center text-slate-400">
-              <div className="p-4 rounded-2xl bg-orange-500/10 text-orange-500 border border-orange-500/20 mb-3 text-2xl shadow-xs">
-                ⚙️
-              </div>
-              <h3 className="text-sm font-semibold capitalize text-slate-800 dark:text-slate-200 font-display">
-                Settings Management
-              </h3>
-              <p className="text-xs text-slate-500 mt-1 max-w-sm">
-                Modul ini terhubung ke Hermes Profile Engine & Aura Smart Settings.
-              </p>
-            </div>
+            <SettingsView pushToast={pushToast} />
           )}
         </main>
       </div>

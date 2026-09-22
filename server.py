@@ -363,6 +363,35 @@ try:
 except Exception as e:
     print(f"Warning: Failed to load chat_ws router: {e}")
 
+# 7. Mount Config & Env Router (/api/config, /api/env, /api/providers) — Settings Hub v0.1.2
+try:
+    from hermes_cli.web_routers import config_env
+    app.include_router(config_env.config_router)  # GET /api/config, /api/config/defaults, /api/config/schema
+    app.include_router(config_env.router)          # GET/PUT /api/env, POST /api/env/reveal, providers
+except Exception as e:
+    print(f"Warning: Failed to load config_env router: {e}")
+
+# 8. Mount Status Router (/api/status, /api/system/stats, /api/health) — Settings Hub v0.1.2
+try:
+    from hermes_cli.web_routers import status as status_router_mod
+    app.include_router(status_router_mod.router)
+except Exception as e:
+    print(f"Warning: Failed to load status router: {e}")
+
+# 9. Mount Memory Providers Router (/api/memory/providers) — Settings Hub v0.1.2
+try:
+    from hermes_cli.web_routers import memory_providers
+    app.include_router(memory_providers.router)
+except Exception as e:
+    print(f"Warning: Failed to load memory_providers router: {e}")
+
+# 10. Mount Messaging Router (/api/messaging/platforms) — Settings Hub v0.1.2
+try:
+    from hermes_cli.web_routers import messaging
+    app.include_router(messaging.router)
+except Exception as e:
+    print(f"Warning: Failed to load messaging router: {e}")
+
 @app.post("/api/sessions")
 def create_session_route(payload: Optional[CreateSessionPayload] = None):
     """Create a new chat session in Hermes state.db."""

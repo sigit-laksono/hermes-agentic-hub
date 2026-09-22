@@ -126,6 +126,21 @@ import {
   ChatSocketController,
 } from './chat'
 
+import {
+  getConfig,
+  getConfigSchema,
+  getConfigDefaults,
+  updateConfig,
+  getEnvVars,
+  updateEnvVar,
+  deleteEnvVar,
+  revealEnvVar,
+  getSystemStatus,
+  getSystemStats,
+  getMessagingPlatforms,
+  getCustomEndpoints,
+} from './settings'
+
 // Re-export chat socket types for backward compatibility (e.g. ChatView.tsx)
 export type { ChatSocketHandlers, ChatSocketController }
 
@@ -240,4 +255,18 @@ export const hermesApi = {
   connectChatStream,
   connectChatWS,
   connectChat,
+
+  // 7. Settings & System Config
+  getConfig,
+  getConfigSchema,
+  getConfigDefaults,
+  updateConfig,
+  getEnvVars,
+  updateEnvVar,
+  deleteEnvVar,
+  revealEnvVar,
+  getSystemStatus,
+  getSystemStats,
+  getMessagingPlatforms,
+  getCustomEndpoints,
 }
