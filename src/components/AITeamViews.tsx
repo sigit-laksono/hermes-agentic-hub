@@ -21,7 +21,9 @@ import {
   Folder,
   Shield,
   Zap,
-  Filter
+  Filter,
+  Trash2,
+  Loader2
 } from 'lucide-react'
 import {
   AIAgent,
@@ -35,6 +37,7 @@ import {
 } from '../types'
 import { hermesApi } from '../api/hermesApi'
 import { MarkdownRenderer } from './MarkdownRenderer'
+import { NewSkillModal } from './NewSkillModal'
 
 // Recommended default template for empty/new agent SOUL.md
 const RECOMMENDED_SOUL_TEMPLATE = (agentName: string, roleDescription?: string) => `# Agent Persona: ${agentName}
@@ -107,6 +110,12 @@ export const AgentDetailDrawer: React.FC<AgentDetailDrawerProps> = ({
   const [skillFilter, setSkillFilter] = useState<string>('')
   const [isLoadingSkills, setIsLoadingSkills] = useState<boolean>(false)
   const [togglingSkill, setTogglingSkill] = useState<string | null>(null)
+
+  // Profile Lifecycle State (TASK-1.5 & TASK-1.6)
+  const [isAutoDescribing, setIsAutoDescribing] = useState<boolean>(false)
+  const [isDeleting, setIsDeleting] = useState<boolean>(false)
+  const [isExporting, setIsExporting] = useState<boolean>(false)
+  const [confirmDelete, setConfirmDelete] = useState<boolean>(false)
 
   // Keyboard shortcut: Escape to close drawer
   useEffect(() => {
@@ -271,6 +280,66 @@ export const AgentDetailDrawer: React.FC<AgentDetailDrawerProps> = ({
     }
   }
 
+  // TASK-1.6: AI Auto-Describe Profile
+  const handleAutoDescribe = async () => {
+    setIsAutoDescribing(true)
+    try {
+      const result = await hermesApi.autoDescribeProfile(agent.id)
+      if (result.ok && result.description) {
+        setDescription(result.description)
+        await hermesApi.updateProfileDescription(agent.id, result.description)
+        onAgentUpdated?.()
+      } else {
+        alert(result.message || 'Failed to auto-describe profile')
+      }
+    } finally {
+      setIsAutoDescribing(false)
+    }
+  }
+
+  // TASK-1.5: Delete Profile
+  const handleDeleteProfile = async () => {
+    if (agent.isDefault) {
+      alert('Cannot delete the default profile')
+      return
+    }
+    setIsDeleting(true)
+    try {
+      const result = await hermesApi.deleteProfile(agent.id)
+      if (result.ok) {
+        onAgentUpdated?.()
+        onClose()
+      } else {
+        alert(result.message || 'Failed to delete profile')
+      }
+    } finally {
+      setIsDeleting(false)
+      setConfirmDelete(false)
+    }
+  }
+
+  // TASK-1.5: Export Profile
+  const handleExportProfile = async () => {
+    setIsExporting(true)
+    try {
+      const result = await hermesApi.exportProfile(agent.id)
+      if (result.ok && result.data) {
+        const dataStr = JSON.stringify(result.data, null, 2)
+        const blob = new Blob([dataStr], { type: 'application/json' })
+        const url = URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = `${agent.id}-profile-export.json`
+        a.click()
+        URL.revokeObjectURL(url)
+      } else {
+        alert(result.message || 'Failed to export profile')
+      }
+    } finally {
+      setIsExporting(false)
+    }
+  }
+
   const isSoulDirty = soulContent !== savedSoulContent
 
   return (
@@ -349,6 +418,52 @@ export const AgentDetailDrawer: React.FC<AgentDetailDrawerProps> = ({
           </div>
         </div>
 
+        {/* TASK-1.5: Profile Lifecycle Actions */}
+        <div className="px-4 py-2 bg-amber-50 dark:bg-amber-950/20 border-b border-amber-200 dark:border-amber-900/30 flex items-center justify-between">
+          <span className="text-[11px] text-amber-700 dark:text-amber-400 font-medium">
+            Profile Management
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleExportProfile}
+              disabled={isExporting}
+              className="flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-blue-100 hover:bg-blue-200 dark:bg-blue-950/40 dark:hover:bg-blue-900/40 text-blue-700 dark:text-blue-300 transition-colors cursor-pointer disabled:opacity-50"
+              title="TASK-1.5: Export profile configuration"
+            >
+              {isExporting ? <Loader2 className="w-3 h-3 animate-spin" /> : <Copy className="w-3 h-3" />}
+              Export
+            </button>
+            {!agent.isDefault && (
+              confirmDelete ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={handleDeleteProfile}
+                    disabled={isDeleting}
+                    className="px-2 py-1 rounded text-[11px] bg-rose-500 hover:bg-rose-600 text-white transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isDeleting ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Confirm Delete'}
+                  </button>
+                  <button
+                    onClick={() => setConfirmDelete(false)}
+                    className="px-2 py-1 rounded text-[11px] bg-slate-200 dark:bg-[#2A2524] hover:bg-slate-300 dark:hover:bg-[#34383F] text-slate-700 dark:text-slate-300 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setConfirmDelete(true)}
+                  className="flex items-center gap-1 px-2 py-1 rounded text-[11px] bg-rose-100 hover:bg-rose-200 dark:bg-rose-950/40 dark:hover:bg-rose-900/40 text-rose-700 dark:text-rose-300 transition-colors cursor-pointer"
+                  title="TASK-1.5: Delete this profile"
+                >
+                  <Trash2 className="w-3 h-3" />
+                  Delete Profile
+                </button>
+              )
+            )}
+          </div>
+        </div>
+
         {/* Drawer Tabs */}
         <div className="px-4 border-b border-slate-200 dark:border-[#23272F] bg-white dark:bg-[#111317] flex items-center gap-6">
           <button
@@ -422,6 +537,15 @@ export const AgentDetailDrawer: React.FC<AgentDetailDrawerProps> = ({
                     placeholder="e.g. Senior Cloud Architect specializing in AWS VPC, IAM, and Terraform..."
                     className="flex-1 px-2.5 py-1.5 text-xs rounded border border-slate-200 dark:border-[#2A2E39] bg-white dark:bg-[#0D0F12] text-slate-900 dark:text-white focus:outline-hidden focus:ring-1 focus:ring-purple-500"
                   />
+                  <button
+                    onClick={handleAutoDescribe}
+                    disabled={isAutoDescribing}
+                    className="flex items-center gap-1 px-2.5 py-1.5 text-xs rounded bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white font-medium transition-colors shadow-xs disabled:opacity-50"
+                    title="TASK-1.6: Generate description from SOUL.md using LLM"
+                  >
+                    {isAutoDescribing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Sparkles className="w-3.5 h-3.5" />}
+                    {isAutoDescribing ? 'Analyzing...' : 'Auto Describe'}
+                  </button>
                   <button
                     onClick={handleSaveDescription}
                     disabled={isSavingDesc}
@@ -1548,6 +1672,10 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
   const [content, setContent] = useState<SkillContent | null>(null)
   const [isLoading, setIsLoading] = useState<boolean>(false)
   const [copied, setCopied] = useState<boolean>(false)
+  const [isEditing, setIsEditing] = useState<boolean>(false)
+  const [editedContent, setEditedContent] = useState<string>('')
+  const [isSaving, setIsSaving] = useState<boolean>(false)
+  const [saveFeedback, setSaveFeedback] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
 
   useEffect(() => {
     if (!skill) return
@@ -1561,8 +1689,13 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
   useEffect(() => {
     if (!skill) return
     setIsLoading(true)
+    setIsEditing(false)
+    setSaveFeedback(null)
     hermesApi.getSkillContent(skill.name)
-      .then(res => setContent(res))
+      .then(res => {
+        setContent(res)
+        setEditedContent(res?.content || '')
+      })
       .finally(() => setIsLoading(false))
   }, [skill])
 
@@ -1573,6 +1706,33 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
     navigator.clipboard.writeText(content.content)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const handleSaveContent = async () => {
+    if (!skill || !editedContent.trim()) return
+    setIsSaving(true)
+    setSaveFeedback(null)
+    try {
+      const ok = await hermesApi.updateSkillContent(skill.name, editedContent.trim())
+      if (ok) {
+        setContent(prev => prev ? { ...prev, content: editedContent.trim() } : null)
+        setIsEditing(false)
+        setSaveFeedback({ type: 'success', message: 'SKILL.md saved successfully' })
+        setTimeout(() => setSaveFeedback(null), 3000)
+      } else {
+        setSaveFeedback({ type: 'error', message: 'Failed to save SKILL.md' })
+      }
+    } catch (e: any) {
+      setSaveFeedback({ type: 'error', message: e.message || 'Error saving content' })
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCancelEdit = () => {
+    setEditedContent(content?.content || '')
+    setIsEditing(false)
+    setSaveFeedback(null)
   }
 
   return (
@@ -1625,24 +1785,70 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
         {/* Action bar */}
         <div className="px-4 py-2 bg-slate-50/50 dark:bg-[#14171D] border-b border-slate-200 dark:border-[#23272F] flex items-center justify-between text-xs text-slate-500">
           <span>Usage: <strong className="text-slate-700 dark:text-slate-300">{skill.usage ?? 0}×</strong></span>
-          <button
-            onClick={handleCopy}
-            disabled={!content?.content}
-            className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
-          >
-            {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
-            {copied ? 'Copied to clipboard' : 'Copy SKILL.md'}
-          </button>
+          <div className="flex items-center gap-2">
+            {saveFeedback && (
+              <span className={`text-[11px] font-medium ${saveFeedback.type === 'success' ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>
+                {saveFeedback.message}
+              </span>
+            )}
+            {!isEditing ? (
+              <>
+                <button
+                  onClick={() => setIsEditing(true)}
+                  disabled={!content?.content}
+                  className="flex items-center gap-1 px-2 py-1 text-[11px] text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-[#23272F] rounded cursor-pointer transition-colors"
+                >
+                  <FileText className="w-3.5 h-3.5" />
+                  Edit
+                </button>
+                <button
+                  onClick={handleCopy}
+                  disabled={!content?.content}
+                  className="flex items-center gap-1 text-[11px] text-blue-600 dark:text-blue-400 hover:underline cursor-pointer"
+                >
+                  {copied ? <Check className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </button>
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={handleCancelEdit}
+                  disabled={isSaving}
+                  className="px-2.5 py-1 text-[11px] text-slate-600 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-[#23272F] rounded cursor-pointer transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSaveContent}
+                  disabled={isSaving}
+                  className="flex items-center gap-1 px-2.5 py-1 text-[11px] bg-blue-600 hover:bg-blue-700 text-white rounded cursor-pointer transition-colors disabled:opacity-50"
+                >
+                  {isSaving ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Save className="w-3.5 h-3.5" />}
+                  Save
+                </button>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* Content viewer */}
+        {/* Content viewer/editor */}
         <div className="flex-1 overflow-y-auto p-4 select-text">
           {isLoading ? (
             <div className="p-8 text-center text-xs text-slate-400">Loading SKILL.md instructions...</div>
           ) : content?.content ? (
-            <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#0D0F12] border border-slate-200 dark:border-[#23272F] text-xs">
-              <MarkdownRenderer content={content.content} />
-            </div>
+            isEditing ? (
+              <textarea
+                value={editedContent}
+                onChange={e => setEditedContent(e.target.value)}
+                className="w-full h-full min-h-[500px] p-4 rounded-lg bg-slate-50 dark:bg-[#0D0F12] border border-slate-200 dark:border-[#23272F] text-xs font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:border-blue-500 resize-none"
+                placeholder="Enter skill instructions in Markdown format..."
+              />
+            ) : (
+              <div className="p-4 rounded-lg bg-slate-50 dark:bg-[#0D0F12] border border-slate-200 dark:border-[#23272F] text-xs">
+                <MarkdownRenderer content={content.content} />
+              </div>
+            )
           ) : (
             <div className="p-8 text-center text-xs text-slate-400 border border-dashed border-slate-200 dark:border-[#23272F] rounded-lg">
               No SKILL.md content found for this skill.
@@ -1661,6 +1867,7 @@ export const SkillsView: React.FC<{
   const [selectedSkill, setSelectedSkill] = useState<Skill | null>(null)
   const [search, setSearch] = useState<string>('')
   const [categoryFilter, setCategoryFilter] = useState<string>('all')
+  const [showNewSkillModal, setShowNewSkillModal] = useState(false)
 
   const categories = useMemo(() => {
     const set = new Set<string>()
@@ -1686,6 +1893,14 @@ export const SkillsView: React.FC<{
     if (selectedSkill && selectedSkill.name === skillName) {
       setSelectedSkill({ ...selectedSkill, enabled })
     }
+  }
+
+  const handleCreateSkill = async (params: { name: string; description?: string; category?: string; content: string }) => {
+    const result = await hermesApi.createSkill(params)
+    if (result.ok) {
+      onRefreshSkills?.()
+    }
+    return result
   }
 
   return (
@@ -1714,6 +1929,15 @@ export const SkillsView: React.FC<{
               className="pl-8 pr-3 py-1.5 text-xs rounded-md border border-slate-200 dark:border-[#2A2E39] bg-slate-50 dark:bg-[#14171D] text-slate-900 dark:text-white"
             />
           </div>
+
+          <button
+            onClick={() => setShowNewSkillModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white transition-all shadow-xs shadow-blue-500/20 active:scale-95 cursor-pointer"
+            title="Create new custom skill"
+          >
+            <Plus className="w-3.5 h-3.5" />
+            <span>New Skill</span>
+          </button>
 
           <button
             onClick={() => onRefreshSkills?.()}
@@ -1814,6 +2038,13 @@ export const SkillsView: React.FC<{
         skill={selectedSkill}
         onClose={() => setSelectedSkill(null)}
         onToggleSkill={handleToggle}
+      />
+
+      {/* New Skill Modal */}
+      <NewSkillModal
+        isOpen={showNewSkillModal}
+        onClose={() => setShowNewSkillModal(false)}
+        onCreate={handleCreateSkill}
       />
     </div>
   )

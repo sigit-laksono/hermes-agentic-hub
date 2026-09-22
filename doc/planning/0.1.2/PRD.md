@@ -2,7 +2,7 @@
 # Settings Hub & Full System Configuration Cockpit
 
 * **Versi Rilis:** `v0.1.2`
-* **Status:** Draft / Planned
+* **Status:** Completed / Implemented
 * **Prasyarat:** `v0.1.1`
 * **Kategori:** Configuration, Security & System Administration
 
@@ -62,8 +62,8 @@ Struktur navigasi internal berbasis sub-menu sidebar:
 
 ## 4. Kriteria Keberhasilan (Acceptance Criteria)
 
-- [ ] Tab Settings menampilkan navigasi internal yang mulus dan responsif.
-- [ ] Perubahan setting di antarmuka berhasil terupdate di `~/.hermes/config.yaml` atau `.env`.
-- [ ] Kunci API tidak terekspos sembarangan (masked secara default).
-- [ ] Status gateway dapat dipantau dan di-restart langsung dari UI.
-- [ ] Hasil audit Hermes Doctor muncul dengan indikator centang hijau atau peringatan kuning/merah.
+- [x] Tab Settings menampilkan navigasi internal yang mulus dan responsif.
+- [x] Perubahan setting di antarmuka berhasil terupdate di `~/.hermes/config.yaml` atau `.env`.
+- [x] Kunci API tidak terekspos sembarangan (masked secara default).
+- [x] Status gateway dapat dipantau dan di-restart langsung dari UI.
+- [x] Hasil audit Hermes Doctor muncul dengan indikator centang hijau atau peringatan kuning/merah.
